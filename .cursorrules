@@ -1,0 +1,250 @@
+{
+  "project": {
+    "name": "Church Management Backend",
+    "description": "A backend API for a church management app using Node.js, Express, Mongoose, Monnify, Pusher, and Cloudflare.",
+    "version": "1.0.0",
+    "language": "JavaScript",
+    "framework": "Express",
+    "database": "MongoDB (Mongoose)",
+    "external_services": [
+      "Monnify",
+      "Pusher",
+      "Cloudflare"
+    ]
+  },
+  "rules": {
+    "file_structure": {
+      "directories": [
+        {
+          "path": "/",
+          "name": "app",
+          "description": "Main application folder containing routes, controllers, and models"
+        },
+        {
+          "path": "/app/routes",
+          "name": "routes",
+          "description": "Contains Express route files"
+        },
+        {
+          "path": "/app/controllers",
+          "name": "controllers",
+          "description": "Contains logic for route handling"
+        },
+        {
+          "path": "/app/models",
+          "name": "models",
+          "description": "Contains Mongoose models for data schema"
+        },
+        {
+          "path": "/app/services",
+          "name": "services",
+          "description": "Contains service layers for integrating external APIs (e.g., Monnify, Pusher)"
+        },
+        {
+          "path": "/app/utils",
+          "name": "utils",
+          "description": "Contains utility functions like validation, logging, etc."
+        },
+        {
+          "path": "/config",
+          "name": "config",
+          "description": "Contains configuration files for environment variables, API keys, etc."
+        }
+      ],
+      "files": [
+        {
+          "path": "/server.js",
+          "name": "server.js",
+          "description": "Main entry point for the Express application"
+        },
+        {
+          "path": "/.env",
+          "name": ".env",
+          "description": "Environment variables (API keys, DB connection URI)"
+        },
+        {
+          "path": "/package.json",
+          "name": "package.json",
+          "description": "NPM configuration file for managing dependencies"
+        },
+        {
+          "path": "/app/routes/donations.js",
+          "name": "donations.js",
+          "description": "Handles routes for donations (including Monnify payment integration)"
+        },
+        {
+          "path": "/app/routes/auth.js",
+          "name": "auth.js",
+          "description": "Handles routes for authentication (login, registration, JWT refresh)"
+        },
+        {
+          "path": "/app/models/Donation.js",
+          "name": "Donation.js",
+          "description": "Mongoose model for storing donation data"
+        },
+        {
+          "path": "/app/models/Church.js",
+          "name": "Church.js",
+          "description": "Mongoose model for managing church information"
+        },
+        {
+          "path": "/app/models/VolunteerTeam.js",
+          "name": "VolunteerTeam.js",
+          "description": "Mongoose model for managing volunteer teams within a church"
+        },
+        {
+          "path": "/app/models/Member.js",
+          "name": "Member.js",
+          "description": "Mongoose model for managing church members, including volunteer and member-specific data"
+        },
+        {
+          "path": "/app/models/Expense.js",
+          "name": "Expense.js",
+          "description": "Mongoose model for tracking church expenses (e.g., utilities, services)"
+        },
+        {
+          "path": "/app/models/DonationCampaign.js",
+          "name": "DonationCampaign.js",
+          "description": "Mongoose model for managing donation campaigns (e.g., GoFundMe-like campaigns)"
+        },
+        {
+          "path": "/app/models/ManualFinancialRecord.js",
+          "name": "ManualFinancialRecord.js",
+          "description": "Mongoose model for recording manual financial transactions (offline donations, backlogged donations)"
+        }
+      ]
+    },
+    "coding_style": {
+      "indentation": "2 spaces",
+      "line_length": 80,
+      "quote_style": "single",
+      "no_trailing_commas": true,
+      "semi_colon": true,
+      "variable_declarations": "let",
+      "function_expression": "arrow",
+      "arrow_parens": "always",
+      "object_properties": "always"
+    },
+    "dependencies": {
+      "express": "^4.17.1",
+      "mongoose": "^6.0.0",
+      "axios": "^0.21.1",
+      "jsonwebtoken": "^8.5.1",
+      "dotenv": "^10.0.0",
+      "cors": "^2.8.5",
+      "pusher": "^4.0.0",
+      "monnify-node-sdk": "^1.0.0",
+      "bcryptjs": "^2.4.3",
+      "express-rate-limit": "^5.3.0",
+      "morgan": "^1.10.0",
+      "compression": "^1.7.4",
+      "helmet": "^4.6.0"
+    },
+    "dev_dependencies": {
+      "nodemon": "^2.0.7",
+      "eslint": "^7.32.0",
+      "eslint-config-airbnb-base": "^14.2.1",
+      "eslint-plugin-import": "^2.23.4",
+      "prettier": "^2.3.0"
+    },
+    "linting": {
+      "enabled": true,
+      "rules": {
+        "semi": [
+          "error",
+          "always"
+        ],
+        "quotes": [
+          "error",
+          "single"
+        ],
+        "no-unused-vars": [
+          "warn"
+        ],
+        "no-console": "warn",
+        "eqeqeq": [
+          "error",
+          "always"
+        ],
+        "prefer-const": "error",
+        "no-magic-numbers": [
+          "warn",
+          {
+            "ignoreArrayIndexes": true
+          }
+        ],
+        "consistent-return": "off",
+        "arrow-body-style": [
+          "error",
+          "as-needed"
+        ],
+        "object-curly-spacing": [
+          "error",
+          "always"
+        ],
+        "comma-dangle": [
+          "error",
+          "never"
+        ]
+      }
+    },
+    "testing": {
+      "enabled": true,
+      "framework": "Jest",
+      "coverage": "75%",
+      "test_files": "/tests/**/*.test.js",
+      "test_environment": "node",
+      "test_setup": "/tests/setup.js",
+      "test_linter": "eslint"
+    },
+    "environment": {
+      "required_variables": [
+        "APP_NAME",
+        "URL",
+        "BACKEND_URL",
+        "PORT",
+        "MONGO_URI",
+        "MONNIFY_API_KEY",
+        "MONNIFY_SECRET_KEY",
+        "PUSHER_APP_ID",
+        "PUSHER_APP_KEY",
+        "PUSHER_APP_SECRET",
+        "PUSHER_APP_CLUSTER",
+        "MAILTRAP_HOST",
+        "MAILTRAP_PORT",
+        "MAILTRAP_USERNAME",
+        "MAILTRAP_PASSWORD",
+        "MAIL_HOST",
+        "MAIL_PORT",
+        "MAIL_ADDR",
+        "MAIL_SECRET",
+        "MAIL_DISPLAYNAME",
+        "JWT_SECRET",
+        "JWT_EXPIRES_IN",
+        "JWT_COOKIE_EXPIRES_IN"
+      ]
+    },
+    "build_tools": {
+      "nodemon": {
+        "watch": [
+          "server.js",
+          "app/**/*.js"
+        ],
+        "exec": "node server.js"
+      },
+      "prettier": {
+        "singleQuote": true,
+        "semi": true
+      }
+    },
+    "server_configuration": {
+      "port": 5000
+    },
+    "api_endpoints": {
+      "POST /api/donate": "Initiates a donation payment via Monnify",
+      "POST /api/payment/callback": "Handles Monnify payment callbacks",
+      "POST /api/send-notification": "Sends real-time notifications via Pusher",
+      "POST /api/manual-financial-record": "Manually records financial transactions (offline donations, backlog entries)"
+    }
+  }
+}
