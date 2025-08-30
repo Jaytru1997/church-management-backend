@@ -455,7 +455,7 @@ donationCampaignSchema.methods.addUpdate = function(updateData) {
 donationCampaignSchema.methods.addMilestone = function(milestoneData) {
   this.milestones.push(milestoneData);
   return this.save();
-});
+};
 
 // Instance method to add image
 donationCampaignSchema.methods.addImage = function(imageData) {

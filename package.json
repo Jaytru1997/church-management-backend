@@ -11,7 +11,8 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "init-subscriptions": "node scripts/init-subscriptions.js"
   },
   "keywords": [
     "church",
