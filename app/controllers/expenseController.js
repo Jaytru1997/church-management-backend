@@ -1,21 +1,38 @@
-const Expense = require('../models/Expense');
-const Church = require('../models/Church');
-const { sendChurchNotification, sendUserNotification } = require('../../config/pusher');
-const emailService = require('../../config/email');
+const Expense = require("../models/Expense");
+const Church = require("../models/Church");
+const {
+  sendChurchNotification,
+  sendUserNotification,
+} = require("../../config/pusher");
+const emailService = require("../../config/email");
 
 // @desc    Create a new expense
 // @route   POST /api/expenses
 // @access  Private (Church Members)
 const createExpense = async (req, res) => {
   try {
-    const { churchId, title, description, amount, currency, category, subcategory, expenseDate, dueDate, priority, paymentMethod, vendor, budget } = req.body;
+    const {
+      churchId,
+      title,
+      description,
+      amount,
+      currency,
+      category,
+      subcategory,
+      expenseDate,
+      dueDate,
+      priority,
+      paymentMethod,
+      vendor,
+      budget,
+    } = req.body;
 
     // Check if church exists
     const church = await Church.findById(churchId);
     if (!church) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Church not found' }
+        error: { message: "Church not found" },
       });
     }
 
@@ -25,7 +42,7 @@ const createExpense = async (req, res) => {
       title,
       description,
       amount,
-      currency: currency || church.settings?.currency || 'NGN',
+      currency: currency || church.settings?.currency || "NGN",
       category,
       subcategory,
       expenseDate: new Date(expenseDate),
@@ -34,28 +51,94 @@ const createExpense = async (req, res) => {
       paymentMethod,
       vendor,
       budget,
-      status: 'pending',
-      submittedBy: req.user.id
+      status: "pending",
+      submittedBy: req.user.id,
     });
 
     // Send real-time notification
-    sendChurchNotification(churchId, 'expense-submitted', {
+    sendChurchNotification(churchId, "expense-submitted", {
       expenseId: expense._id,
       title: expense.title,
       amount: expense.amount,
-      submittedBy: req.user.id
+      submittedBy: req.user.id,
     });
 
     res.status(201).json({
       success: true,
       data: { expense },
-      message: 'Expense submitted successfully'
+      message: "Expense submitted successfully",
     });
   } catch (error) {
-    console.error('Create expense error:', error);
+    console.error("Create expense error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to submit expense' }
+      error: { message: "Failed to submit expense" },
+    });
+  }
+};
+
+// @desc    Get expenses by church
+// @route   GET /api/expenses/church/:churchId
+// @access  Private (Church Members)
+const getExpensesByChurch = async (req, res) => {
+  try {
+    const { churchId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const { category, status, priority, startDate, endDate, search } =
+      req.query;
+    const filter = { churchId };
+
+    if (category) filter.category = category;
+    if (status) filter.status = status;
+    if (priority) filter.priority = priority;
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    // Text search
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+        { subcategory: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const expenses = await Expense.find(filter)
+      .populate("requestedBy", "firstName lastName email")
+      .populate("approvedBy", "firstName lastName")
+      .populate("churchId", "name")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    const total = await Expense.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: {
+        expenses,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get expenses by church error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to get expenses" },
     });
   }
 };
@@ -69,7 +152,8 @@ const getAllExpenses = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const { churchId, status, category, priority, startDate, endDate, search } = req.query;
+    const { churchId, status, category, priority, startDate, endDate, search } =
+      req.query;
     const filter = {};
 
     if (churchId) filter.churchId = churchId;
@@ -87,17 +171,17 @@ const getAllExpenses = async (req, res) => {
     // Text search
     if (search) {
       filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { 'vendor.name': { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } }
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { "vendor.name": { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
       ];
     }
 
     const expenses = await Expense.find(filter)
-      .populate('churchId', 'name')
-      .populate('submittedBy', 'firstName lastName')
-      .populate('approvedBy', 'firstName lastName')
+      .populate("churchId", "name")
+      .populate("submittedBy", "firstName lastName")
+      .populate("approvedBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
@@ -112,15 +196,15 @@ const getAllExpenses = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get all expenses error:', error);
+    console.error("Get all expenses error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get expenses' }
+      error: { message: "Failed to get expenses" },
     });
   }
 };
@@ -131,26 +215,26 @@ const getAllExpenses = async (req, res) => {
 const getExpenseById = async (req, res) => {
   try {
     const expense = await Expense.findById(req.params.id)
-      .populate('churchId', 'name')
-      .populate('submittedBy', 'firstName lastName email')
-      .populate('approvedBy', 'firstName lastName email');
+      .populate("churchId", "name")
+      .populate("submittedBy", "firstName lastName email")
+      .populate("approvedBy", "firstName lastName email");
 
     if (!expense) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Expense not found' }
+        error: { message: "Expense not found" },
       });
     }
 
     res.json({
       success: true,
-      data: { expense }
+      data: { expense },
     });
   } catch (error) {
-    console.error('Get expense by ID error:', error);
+    console.error("Get expense by ID error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get expense' }
+      error: { message: "Failed to get expense" },
     });
   }
 };
@@ -160,22 +244,34 @@ const getExpenseById = async (req, res) => {
 // @access  Private (Church Members)
 const updateExpense = async (req, res) => {
   try {
-    const { title, description, amount, category, subcategory, expenseDate, dueDate, priority, paymentMethod, vendor, budget } = req.body;
+    const {
+      title,
+      description,
+      amount,
+      category,
+      subcategory,
+      expenseDate,
+      dueDate,
+      priority,
+      paymentMethod,
+      vendor,
+      budget,
+    } = req.body;
     const expenseId = req.params.id;
 
     const expense = await Expense.findById(expenseId);
     if (!expense) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Expense not found' }
+        error: { message: "Expense not found" },
       });
     }
 
     // Only allow updates to pending expenses
-    if (expense.status !== 'pending') {
+    if (expense.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Cannot update approved or rejected expenses' }
+        error: { message: "Cannot update approved or rejected expenses" },
       });
     }
 
@@ -200,13 +296,13 @@ const updateExpense = async (req, res) => {
     res.json({
       success: true,
       data: { expense },
-      message: 'Expense updated successfully'
+      message: "Expense updated successfully",
     });
   } catch (error) {
-    console.error('Update expense error:', error);
+    console.error("Update expense error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update expense' }
+      error: { message: "Failed to update expense" },
     });
   }
 };
@@ -222,15 +318,15 @@ const deleteExpense = async (req, res) => {
     if (!expense) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Expense not found' }
+        error: { message: "Expense not found" },
       });
     }
 
     // Only allow deletion of pending expenses
-    if (expense.status !== 'pending') {
+    if (expense.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Cannot delete approved or rejected expenses' }
+        error: { message: "Cannot delete approved or rejected expenses" },
       });
     }
 
@@ -238,13 +334,13 @@ const deleteExpense = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Expense deleted successfully'
+      message: "Expense deleted successfully",
     });
   } catch (error) {
-    console.error('Delete expense error:', error);
+    console.error("Delete expense error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to delete expense' }
+      error: { message: "Failed to delete expense" },
     });
   }
 };
@@ -261,14 +357,14 @@ const approveExpense = async (req, res) => {
     if (!expense) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Expense not found' }
+        error: { message: "Expense not found" },
       });
     }
 
-    if (expense.status !== 'pending') {
+    if (expense.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Expense is not pending approval' }
+        error: { message: "Expense is not pending approval" },
       });
     }
 
@@ -276,33 +372,33 @@ const approveExpense = async (req, res) => {
     await expense.save();
 
     // Send real-time notification
-    sendChurchNotification(expense.churchId, 'expense-approved', {
+    sendChurchNotification(expense.churchId, "expense-approved", {
       expenseId: expense._id,
       title: expense.title,
       amount: expense.amount,
-      approvedBy: req.user.id
+      approvedBy: req.user.id,
     });
 
     // Send notification to submitter
     if (expense.submittedBy) {
-      sendUserNotification(expense.submittedBy, 'expense-approved', {
+      sendUserNotification(expense.submittedBy, "expense-approved", {
         expenseId: expense._id,
         title: expense.title,
         amount: expense.amount,
-        approvedBy: req.user.id
+        approvedBy: req.user.id,
       });
     }
 
     res.json({
       success: true,
       data: { expense },
-      message: 'Expense approved successfully'
+      message: "Expense approved successfully",
     });
   } catch (error) {
-    console.error('Approve expense error:', error);
+    console.error("Approve expense error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to approve expense' }
+      error: { message: "Failed to approve expense" },
     });
   }
 };
@@ -319,14 +415,14 @@ const rejectExpense = async (req, res) => {
     if (!expense) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Expense not found' }
+        error: { message: "Expense not found" },
       });
     }
 
-    if (expense.status !== 'pending') {
+    if (expense.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Expense is not pending approval' }
+        error: { message: "Expense is not pending approval" },
       });
     }
 
@@ -334,35 +430,35 @@ const rejectExpense = async (req, res) => {
     await expense.save();
 
     // Send real-time notification
-    sendChurchNotification(expense.churchId, 'expense-rejected', {
+    sendChurchNotification(expense.churchId, "expense-rejected", {
       expenseId: expense._id,
       title: expense.title,
       amount: expense.amount,
       rejectedBy: req.user.id,
-      reason
+      reason,
     });
 
     // Send notification to submitter
     if (expense.submittedBy) {
-      sendUserNotification(expense.submittedBy, 'expense-rejected', {
+      sendUserNotification(expense.submittedBy, "expense-rejected", {
         expenseId: expense._id,
         title: expense.title,
         amount: expense.amount,
         rejectedBy: req.user.id,
-        reason
+        reason,
       });
     }
 
     res.json({
       success: true,
       data: { expense },
-      message: 'Expense rejected successfully'
+      message: "Expense rejected successfully",
     });
   } catch (error) {
-    console.error('Reject expense error:', error);
+    console.error("Reject expense error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to reject expense' }
+      error: { message: "Failed to reject expense" },
     });
   }
 };
@@ -379,14 +475,14 @@ const markExpenseAsPaid = async (req, res) => {
     if (!expense) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Expense not found' }
+        error: { message: "Expense not found" },
       });
     }
 
-    if (expense.status !== 'approved') {
+    if (expense.status !== "approved") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Expense must be approved before marking as paid' }
+        error: { message: "Expense must be approved before marking as paid" },
       });
     }
 
@@ -394,23 +490,23 @@ const markExpenseAsPaid = async (req, res) => {
     await expense.save();
 
     // Send real-time notification
-    sendChurchNotification(expense.churchId, 'expense-paid', {
+    sendChurchNotification(expense.churchId, "expense-paid", {
       expenseId: expense._id,
       title: expense.title,
       amount: expense.amount,
-      markedBy: req.user.id
+      markedBy: req.user.id,
     });
 
     res.json({
       success: true,
       data: { expense },
-      message: 'Expense marked as paid successfully'
+      message: "Expense marked as paid successfully",
     });
   } catch (error) {
-    console.error('Mark expense as paid error:', error);
+    console.error("Mark expense as paid error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to mark expense as paid' }
+      error: { message: "Failed to mark expense as paid" },
     });
   }
 };
@@ -427,7 +523,7 @@ const addAttachment = async (req, res) => {
     if (!expense) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Expense not found' }
+        error: { message: "Expense not found" },
       });
     }
 
@@ -438,7 +534,7 @@ const addAttachment = async (req, res) => {
       size,
       url,
       uploadedAt: new Date(),
-      uploadedBy: req.user.id
+      uploadedBy: req.user.id,
     };
 
     expense.attachments.push(attachment);
@@ -447,13 +543,13 @@ const addAttachment = async (req, res) => {
     res.status(201).json({
       success: true,
       data: { attachment },
-      message: 'Attachment added successfully'
+      message: "Attachment added successfully",
     });
   } catch (error) {
-    console.error('Add attachment error:', error);
+    console.error("Add attachment error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to add attachment' }
+      error: { message: "Failed to add attachment" },
     });
   }
 };
@@ -469,7 +565,7 @@ const removeAttachment = async (req, res) => {
     if (!expense) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Expense not found' }
+        error: { message: "Expense not found" },
       });
     }
 
@@ -477,7 +573,7 @@ const removeAttachment = async (req, res) => {
     if (!attachment) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Attachment not found' }
+        error: { message: "Attachment not found" },
       });
     }
 
@@ -486,13 +582,13 @@ const removeAttachment = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Attachment removed successfully'
+      message: "Attachment removed successfully",
     });
   } catch (error) {
-    console.error('Remove attachment error:', error);
+    console.error("Remove attachment error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to remove attachment' }
+      error: { message: "Failed to remove attachment" },
     });
   }
 };
@@ -509,15 +605,15 @@ const addNote = async (req, res) => {
     if (!expense) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Expense not found' }
+        error: { message: "Expense not found" },
       });
     }
 
     const note = {
       content,
-      type: type || 'general',
+      type: type || "general",
       author: req.user.id,
-      date: new Date()
+      date: new Date(),
     };
 
     expense.notes.push(note);
@@ -526,13 +622,13 @@ const addNote = async (req, res) => {
     res.status(201).json({
       success: true,
       data: { note },
-      message: 'Note added successfully'
+      message: "Note added successfully",
     });
   } catch (error) {
-    console.error('Add note error:', error);
+    console.error("Add note error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to add note' }
+      error: { message: "Failed to add note" },
     });
   }
 };
@@ -549,7 +645,7 @@ const updateTags = async (req, res) => {
     if (!expense) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Expense not found' }
+        error: { message: "Expense not found" },
       });
     }
 
@@ -559,13 +655,13 @@ const updateTags = async (req, res) => {
     res.json({
       success: true,
       data: { tags: expense.tags },
-      message: 'Tags updated successfully'
+      message: "Tags updated successfully",
     });
   } catch (error) {
-    console.error('Update tags error:', error);
+    console.error("Update tags error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update tags' }
+      error: { message: "Failed to update tags" },
     });
   }
 };
@@ -585,17 +681,21 @@ const getExpenseStats = async (req, res) => {
       if (endDate) filter.expenseDate.$lte = new Date(endDate);
     }
 
-    const stats = await Expense.getExpenseStats(filter.churchId, filter.expenseDate?.$gte, filter.expenseDate?.$lte);
+    const stats = await Expense.getExpenseStats(
+      filter.churchId,
+      filter.expenseDate?.$gte,
+      filter.expenseDate?.$lte
+    );
 
     res.json({
       success: true,
-      data: { stats }
+      data: { stats },
     });
   } catch (error) {
-    console.error('Get expense stats error:', error);
+    console.error("Get expense stats error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get expense statistics' }
+      error: { message: "Failed to get expense statistics" },
     });
   }
 };
@@ -619,24 +719,24 @@ const getExpensesByCategory = async (req, res) => {
       { $match: filter },
       {
         $group: {
-          _id: '$category',
-          totalAmount: { $sum: '$amount' },
+          _id: "$category",
+          totalAmount: { $sum: "$amount" },
           count: { $sum: 1 },
-          averageAmount: { $avg: '$amount' }
-        }
+          averageAmount: { $avg: "$amount" },
+        },
       },
-      { $sort: { totalAmount: -1 } }
+      { $sort: { totalAmount: -1 } },
     ]);
 
     res.json({
       success: true,
-      data: { stats }
+      data: { stats },
     });
   } catch (error) {
-    console.error('Get expenses by category error:', error);
+    console.error("Get expenses by category error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get category statistics' }
+      error: { message: "Failed to get category statistics" },
     });
   }
 };
@@ -646,7 +746,7 @@ const getExpensesByCategory = async (req, res) => {
 // @access  Private (Church Members)
 const getExpensesByDate = async (req, res) => {
   try {
-    const { churchId, startDate, endDate, groupBy = 'day' } = req.query;
+    const { churchId, startDate, endDate, groupBy = "day" } = req.query;
 
     const filter = {};
     if (churchId) filter.churchId = churchId;
@@ -657,12 +757,14 @@ const getExpensesByDate = async (req, res) => {
     }
 
     let dateFormat;
-    if (groupBy === 'month') {
-      dateFormat = { $dateToString: { format: '%Y-%m', date: '$expenseDate' } };
-    } else if (groupBy === 'week') {
-      dateFormat = { $dateToString: { format: '%Y-%U', date: '$expenseDate' } };
+    if (groupBy === "month") {
+      dateFormat = { $dateToString: { format: "%Y-%m", date: "$expenseDate" } };
+    } else if (groupBy === "week") {
+      dateFormat = { $dateToString: { format: "%Y-%U", date: "$expenseDate" } };
     } else {
-      dateFormat = { $dateToString: { format: '%Y-%m-%d', date: '$expenseDate' } };
+      dateFormat = {
+        $dateToString: { format: "%Y-%m-%d", date: "$expenseDate" },
+      };
     }
 
     const stats = await Expense.aggregate([
@@ -670,22 +772,22 @@ const getExpensesByDate = async (req, res) => {
       {
         $group: {
           _id: dateFormat,
-          totalAmount: { $sum: '$amount' },
-          count: { $sum: 1 }
-        }
+          totalAmount: { $sum: "$amount" },
+          count: { $sum: 1 },
+        },
       },
-      { $sort: { _id: 1 } }
+      { $sort: { _id: 1 } },
     ]);
 
     res.json({
       success: true,
-      data: { stats }
+      data: { stats },
     });
   } catch (error) {
-    console.error('Get expenses by date error:', error);
+    console.error("Get expenses by date error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get date statistics' }
+      error: { message: "Failed to get date statistics" },
     });
   }
 };
@@ -700,12 +802,12 @@ const getPendingExpenses = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const filter = { status: 'pending' };
+    const filter = { status: "pending" };
     if (churchId) filter.churchId = churchId;
 
     const expenses = await Expense.find(filter)
-      .populate('churchId', 'name')
-      .populate('submittedBy', 'firstName lastName')
+      .populate("churchId", "name")
+      .populate("submittedBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
@@ -720,15 +822,15 @@ const getPendingExpenses = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get pending expenses error:', error);
+    console.error("Get pending expenses error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get pending expenses' }
+      error: { message: "Failed to get pending expenses" },
     });
   }
 };
@@ -743,13 +845,13 @@ const getApprovedExpenses = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const filter = { status: 'approved' };
+    const filter = { status: "approved" };
     if (churchId) filter.churchId = churchId;
 
     const expenses = await Expense.find(filter)
-      .populate('churchId', 'name')
-      .populate('submittedBy', 'firstName lastName')
-      .populate('approvedBy', 'firstName lastName')
+      .populate("churchId", "name")
+      .populate("submittedBy", "firstName lastName")
+      .populate("approvedBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
@@ -764,15 +866,15 @@ const getApprovedExpenses = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get approved expenses error:', error);
+    console.error("Get approved expenses error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get approved expenses' }
+      error: { message: "Failed to get approved expenses" },
     });
   }
 };
@@ -787,13 +889,13 @@ const getRejectedExpenses = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const filter = { status: 'rejected' };
+    const filter = { status: "rejected" };
     if (churchId) filter.churchId = churchId;
 
     const expenses = await Expense.find(filter)
-      .populate('churchId', 'name')
-      .populate('submittedBy', 'firstName lastName')
-      .populate('rejectedBy', 'firstName lastName')
+      .populate("churchId", "name")
+      .populate("submittedBy", "firstName lastName")
+      .populate("rejectedBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
@@ -808,15 +910,369 @@ const getRejectedExpenses = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get rejected expenses error:', error);
+    console.error("Get rejected expenses error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get rejected expenses' }
+      error: { message: "Failed to get rejected expenses" },
+    });
+  }
+};
+
+// @desc    Update expense note
+// @route   PUT /api/expenses/:id/notes/:noteId
+// @access  Private (Church Members)
+const updateNote = async (req, res) => {
+  try {
+    const { id, noteId } = req.params;
+    const { content, category } = req.body;
+
+    const expense = await Expense.findById(id);
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Expense not found" },
+      });
+    }
+
+    const noteIndex = expense.notes.findIndex(
+      (n) => n._id.toString() === noteId
+    );
+    if (noteIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Note not found" },
+      });
+    }
+
+    if (content) expense.notes[noteIndex].content = content;
+    if (category) expense.notes[noteIndex].category = category;
+
+    await expense.save();
+
+    res.json({
+      success: true,
+      data: { note: expense.notes[noteIndex] },
+      message: "Note updated successfully",
+    });
+  } catch (error) {
+    console.error("Update note error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to update note" },
+    });
+  }
+};
+
+// @desc    Delete expense note
+// @route   DELETE /api/expenses/:id/notes/:noteId
+// @access  Private (Church Members)
+const deleteNote = async (req, res) => {
+  try {
+    const { id, noteId } = req.params;
+
+    const expense = await Expense.findById(id);
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Expense not found" },
+      });
+    }
+
+    const noteIndex = expense.notes.findIndex(
+      (n) => n._id.toString() === noteId
+    );
+    if (noteIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Note not found" },
+      });
+    }
+
+    expense.notes.splice(noteIndex, 1);
+    await expense.save();
+
+    res.json({
+      success: true,
+      message: "Note deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete note error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to delete note" },
+    });
+  }
+};
+
+// @desc    Add tags to expense
+// @route   POST /api/expenses/:id/tags
+// @access  Private (Church Members)
+const addTags = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.body;
+
+    const expense = await Expense.findById(id);
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Expense not found" },
+      });
+    }
+
+    // Add new tags without duplicates
+    tags.forEach((tag) => {
+      if (!expense.tags.includes(tag)) {
+        expense.tags.push(tag);
+      }
+    });
+
+    await expense.save();
+
+    res.status(201).json({
+      success: true,
+      data: { tags: expense.tags },
+      message: "Tags added successfully",
+    });
+  } catch (error) {
+    console.error("Add tags error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to add tags" },
+    });
+  }
+};
+
+// @desc    Remove tags from expense
+// @route   DELETE /api/expenses/:id/tags
+// @access  Private (Church Members)
+const removeTags = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.body;
+
+    const expense = await Expense.findById(id);
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Expense not found" },
+      });
+    }
+
+    // Remove specified tags
+    expense.tags = expense.tags.filter((tag) => !tags.includes(tag));
+    await expense.save();
+
+    res.json({
+      success: true,
+      data: { tags: expense.tags },
+      message: "Tags removed successfully",
+    });
+  } catch (error) {
+    console.error("Remove tags error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to remove tags" },
+    });
+  }
+};
+
+// @desc    Get total expenses for a church
+// @route   GET /api/expenses/totals/church/:churchId
+// @access  Private (Church Members)
+const getTotalExpenses = async (req, res) => {
+  try {
+    const { churchId } = req.params;
+    const { startDate, endDate, category } = req.query;
+
+    const filter = { churchId, status: "approved" };
+
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    if (category) filter.category = category;
+
+    const totalAmount = await Expense.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+
+    const totalCount = await Expense.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: {
+        totalAmount: totalAmount[0]?.total || 0,
+        totalCount,
+        currency: "NGN",
+      },
+    });
+  } catch (error) {
+    console.error("Get total expenses error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to get total expenses" },
+    });
+  }
+};
+
+// @desc    Bulk import expenses
+// @route   POST /api/expenses/bulk-import
+// @access  Private (Church Admin)
+const bulkImportExpenses = async (req, res) => {
+  try {
+    const { churchId, expenses } = req.body;
+
+    if (!expenses || !Array.isArray(expenses) || expenses.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: "Expenses array is required" },
+      });
+    }
+
+    const results = {
+      success: [],
+      errors: [],
+    };
+
+    for (const expenseData of expenses) {
+      try {
+        const expense = await Expense.create({
+          churchId,
+          ...expenseData,
+          status: "pending",
+        });
+        results.success.push(expense);
+      } catch (error) {
+        results.errors.push({
+          data: expenseData,
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: { results },
+      message: `Successfully imported ${results.success.length} expenses`,
+    });
+  } catch (error) {
+    console.error("Bulk import expenses error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to bulk import expenses" },
+    });
+  }
+};
+
+// @desc    Export expenses
+// @route   GET /api/expenses/export
+// @access  Private (Church Admin)
+const exportExpenses = async (req, res) => {
+  try {
+    const { churchId, format = "csv" } = req.query;
+
+    // In a real implementation, you would export expenses to the specified format
+    // For now, we'll return a mock response
+    console.log("Exporting expenses:", { churchId, format });
+
+    res.json({
+      success: true,
+      message: "Expenses exported successfully",
+      data: { downloadUrl: "/exports/expenses.csv" },
+    });
+  } catch (error) {
+    console.error("Export expenses error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to export expenses" },
+    });
+  }
+};
+
+// @desc    Setup recurring expense
+// @route   POST /api/expenses/:id/recurring
+// @access  Private (Church Admin)
+const setupRecurringExpense = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { frequency, interval, endDate } = req.body;
+
+    const expense = await Expense.findById(id);
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Expense not found" },
+      });
+    }
+
+    expense.recurring = {
+      isRecurring: true,
+      frequency,
+      interval,
+      endDate: endDate ? new Date(endDate) : null,
+      nextDueDate: expense.dueDate,
+    };
+
+    await expense.save();
+
+    res.json({
+      success: true,
+      data: { expense },
+      message: "Recurring expense setup successfully",
+    });
+  } catch (error) {
+    console.error("Setup recurring expense error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to setup recurring expense" },
+    });
+  }
+};
+
+// @desc    Remove recurring expense
+// @route   DELETE /api/expenses/:id/recurring
+// @access  Private (Church Admin)
+const removeRecurringExpense = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const expense = await Expense.findById(id);
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Expense not found" },
+      });
+    }
+
+    expense.recurring = {
+      isRecurring: false,
+      frequency: null,
+      interval: null,
+      endDate: null,
+      nextDueDate: null,
+    };
+
+    await expense.save();
+
+    res.json({
+      success: true,
+      data: { expense },
+      message: "Recurring expense removed successfully",
+    });
+  } catch (error) {
+    console.error("Remove recurring expense error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to remove recurring expense" },
     });
   }
 };
@@ -835,8 +1291,8 @@ const getOverdueExpenses = async (req, res) => {
     if (churchId) filter.churchId = churchId;
 
     const expenses = await Expense.find(filter)
-      .populate('churchId', 'name')
-      .populate('submittedBy', 'firstName lastName')
+      .populate("churchId", "name")
+      .populate("submittedBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ dueDate: 1 });
@@ -851,15 +1307,15 @@ const getOverdueExpenses = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get overdue expenses error:', error);
+    console.error("Get overdue expenses error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get overdue expenses' }
+      error: { message: "Failed to get overdue expenses" },
     });
   }
 };
@@ -867,6 +1323,7 @@ const getOverdueExpenses = async (req, res) => {
 module.exports = {
   createExpense,
   getAllExpenses,
+  getExpensesByChurch,
   getExpenseById,
   updateExpense,
   deleteExpense,
@@ -876,12 +1333,21 @@ module.exports = {
   addAttachment,
   removeAttachment,
   addNote,
+  updateNote,
+  deleteNote,
+  addTags,
+  removeTags,
   updateTags,
   getExpenseStats,
+  getTotalExpenses,
   getExpensesByCategory,
   getExpensesByDate,
   getPendingExpenses,
   getApprovedExpenses,
   getRejectedExpenses,
-  getOverdueExpenses
+  getOverdueExpenses,
+  bulkImportExpenses,
+  exportExpenses,
+  setupRecurringExpense,
+  removeRecurringExpense,
 };

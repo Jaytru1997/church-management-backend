@@ -1,21 +1,37 @@
-const DonationCampaign = require('../models/DonationCampaign');
-const Church = require('../models/Church');
-const { sendChurchNotification, sendUserNotification } = require('../../config/pusher');
-const emailService = require('../../config/email');
+const DonationCampaign = require("../models/DonationCampaign");
+const Church = require("../models/Church");
+const {
+  sendChurchNotification,
+  sendUserNotification,
+} = require("../../config/pusher");
+const emailService = require("../../config/email");
 
 // @desc    Create a new donation campaign
 // @route   POST /api/campaigns
 // @access  Private (Church Admin)
 const createCampaign = async (req, res) => {
   try {
-    const { churchId, title, description, category, targetAmount, startDate, endDate, images, video, socialSharing, donorWall, settings } = req.body;
+    const {
+      churchId,
+      title,
+      description,
+      category,
+      targetAmount,
+      startDate,
+      endDate,
+      images,
+      video,
+      socialSharing,
+      donorWall,
+      settings,
+    } = req.body;
 
     // Check if church exists
     const church = await Church.findById(churchId);
     if (!church) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Church not found' }
+        error: { message: "Church not found" },
       });
     }
 
@@ -33,28 +49,85 @@ const createCampaign = async (req, res) => {
       socialSharing,
       donorWall,
       settings,
-      status: 'pending',
-      createdBy: req.user.id
+      status: "pending",
+      createdBy: req.user.id,
     });
 
     // Send real-time notification
-    sendChurchNotification(churchId, 'campaign-created', {
+    sendChurchNotification(churchId, "campaign-created", {
       campaignId: campaign._id,
       title: campaign.title,
       targetAmount: campaign.targetAmount,
-      createdBy: req.user.id
+      createdBy: req.user.id,
     });
 
     res.status(201).json({
       success: true,
       data: { campaign },
-      message: 'Campaign created successfully'
+      message: "Campaign created successfully",
     });
   } catch (error) {
-    console.error('Create campaign error:', error);
+    console.error("Create campaign error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to create campaign' }
+      error: { message: "Failed to create campaign" },
+    });
+  }
+};
+
+// @desc    Get campaigns by church
+// @route   GET /api/campaigns/church/:churchId
+// @access  Public
+const getCampaignsByChurch = async (req, res) => {
+  try {
+    const { churchId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const { category, status, isUrgent, isFeatured, search } = req.query;
+    const filter = { churchId };
+
+    if (category) filter.category = category;
+    if (status) filter.status = status;
+    if (isUrgent !== undefined) filter.isUrgent = isUrgent === "true";
+    if (isFeatured !== undefined) filter.isFeatured = isFeatured === "true";
+
+    // Text search
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const campaigns = await DonationCampaign.find(filter)
+      .populate("churchId", "name")
+      .populate("createdBy", "firstName lastName")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    const total = await DonationCampaign.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: {
+        campaigns,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get campaigns by church error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to get campaigns" },
     });
   }
 };
@@ -74,22 +147,22 @@ const getAllCampaigns = async (req, res) => {
     if (churchId) filter.churchId = churchId;
     if (category) filter.category = category;
     if (status) filter.status = status;
-    if (featured === 'true') filter.isFeatured = true;
-    if (urgent === 'true') filter.isUrgent = true;
+    if (featured === "true") filter.isFeatured = true;
+    if (urgent === "true") filter.isUrgent = true;
 
     // Text search
     if (search) {
       filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } }
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
       ];
     }
 
     const campaigns = await DonationCampaign.find(filter)
-      .populate('churchId', 'name logo')
-      .populate('createdBy', 'firstName lastName')
-      .populate('approvedBy', 'firstName lastName')
+      .populate("churchId", "name logo")
+      .populate("createdBy", "firstName lastName")
+      .populate("approvedBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
@@ -104,15 +177,15 @@ const getAllCampaigns = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get all campaigns error:', error);
+    console.error("Get all campaigns error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get campaigns' }
+      error: { message: "Failed to get campaigns" },
     });
   }
 };
@@ -132,9 +205,9 @@ const searchCampaigns = async (req, res) => {
     // Text search
     if (q) {
       filter.$or = [
-        { title: { $regex: q, $options: 'i' } },
-        { description: { $regex: q, $options: 'i' } },
-        { category: { $regex: q, $options: 'i' } }
+        { title: { $regex: q, $options: "i" } },
+        { description: { $regex: q, $options: "i" } },
+        { category: { $regex: q, $options: "i" } },
       ];
     }
 
@@ -142,12 +215,12 @@ const searchCampaigns = async (req, res) => {
     if (churchId) filter.churchId = churchId;
     if (category) filter.category = category;
     if (status) filter.status = status;
-    if (featured === 'true') filter.isFeatured = true;
-    if (urgent === 'true') filter.isUrgent = true;
+    if (featured === "true") filter.isFeatured = true;
+    if (urgent === "true") filter.isUrgent = true;
 
     const campaigns = await DonationCampaign.find(filter)
-      .populate('churchId', 'name logo')
-      .populate('createdBy', 'firstName lastName')
+      .populate("churchId", "name logo")
+      .populate("createdBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
@@ -162,15 +235,15 @@ const searchCampaigns = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Search campaigns error:', error);
+    console.error("Search campaigns error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to search campaigns' }
+      error: { message: "Failed to search campaigns" },
     });
   }
 };
@@ -181,14 +254,14 @@ const searchCampaigns = async (req, res) => {
 const getCampaignById = async (req, res) => {
   try {
     const campaign = await DonationCampaign.findById(req.params.id)
-      .populate('churchId', 'name logo banner address contact')
-      .populate('createdBy', 'firstName lastName')
-      .populate('approvedBy', 'firstName lastName');
+      .populate("churchId", "name logo banner address contact")
+      .populate("createdBy", "firstName lastName")
+      .populate("approvedBy", "firstName lastName");
 
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -198,13 +271,13 @@ const getCampaignById = async (req, res) => {
 
     res.json({
       success: true,
-      data: { campaign }
+      data: { campaign },
     });
   } catch (error) {
-    console.error('Get campaign by ID error:', error);
+    console.error("Get campaign by ID error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get campaign' }
+      error: { message: "Failed to get campaign" },
     });
   }
 };
@@ -214,22 +287,34 @@ const getCampaignById = async (req, res) => {
 // @access  Private (Church Admin)
 const updateCampaign = async (req, res) => {
   try {
-    const { title, description, category, targetAmount, startDate, endDate, images, video, socialSharing, donorWall, settings } = req.body;
+    const {
+      title,
+      description,
+      category,
+      targetAmount,
+      startDate,
+      endDate,
+      images,
+      video,
+      socialSharing,
+      donorWall,
+      settings,
+    } = req.body;
     const campaignId = req.params.id;
 
     const campaign = await DonationCampaign.findById(campaignId);
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
     // Only allow updates to pending campaigns
-    if (campaign.status !== 'pending') {
+    if (campaign.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Cannot update active or completed campaigns' }
+        error: { message: "Cannot update active or completed campaigns" },
       });
     }
 
@@ -242,7 +327,8 @@ const updateCampaign = async (req, res) => {
     if (endDate) campaign.endDate = new Date(endDate);
     if (images) campaign.images = images;
     if (video) campaign.video = video;
-    if (socialSharing) campaign.socialSharing = { ...campaign.socialSharing, ...socialSharing };
+    if (socialSharing)
+      campaign.socialSharing = { ...campaign.socialSharing, ...socialSharing };
     if (donorWall) campaign.donorWall = { ...campaign.donorWall, ...donorWall };
     if (settings) campaign.settings = { ...campaign.settings, ...settings };
 
@@ -252,22 +338,22 @@ const updateCampaign = async (req, res) => {
     await campaign.save();
 
     // Send real-time notification
-    sendChurchNotification(campaign.churchId, 'campaign-updated', {
+    sendChurchNotification(campaign.churchId, "campaign-updated", {
       campaignId: campaign._id,
       title: campaign.title,
-      updatedBy: req.user.id
+      updatedBy: req.user.id,
     });
 
     res.json({
       success: true,
       data: { campaign },
-      message: 'Campaign updated successfully'
+      message: "Campaign updated successfully",
     });
   } catch (error) {
-    console.error('Update campaign error:', error);
+    console.error("Update campaign error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update campaign' }
+      error: { message: "Failed to update campaign" },
     });
   }
 };
@@ -283,36 +369,36 @@ const deleteCampaign = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
     // Only allow deletion of pending campaigns
-    if (campaign.status !== 'pending') {
+    if (campaign.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Cannot delete active or completed campaigns' }
+        error: { message: "Cannot delete active or completed campaigns" },
       });
     }
 
     await DonationCampaign.findByIdAndDelete(campaignId);
 
     // Send real-time notification
-    sendChurchNotification(campaign.churchId, 'campaign-deleted', {
+    sendChurchNotification(campaign.churchId, "campaign-deleted", {
       campaignId: campaign._id,
       title: campaign.title,
-      deletedBy: req.user.id
+      deletedBy: req.user.id,
     });
 
     res.json({
       success: true,
-      message: 'Campaign deleted successfully'
+      message: "Campaign deleted successfully",
     });
   } catch (error) {
-    console.error('Delete campaign error:', error);
+    console.error("Delete campaign error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to delete campaign' }
+      error: { message: "Failed to delete campaign" },
     });
   }
 };
@@ -329,14 +415,14 @@ const approveCampaign = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
-    if (campaign.status !== 'pending') {
+    if (campaign.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Campaign is not pending approval' }
+        error: { message: "Campaign is not pending approval" },
       });
     }
 
@@ -344,22 +430,22 @@ const approveCampaign = async (req, res) => {
     await campaign.save();
 
     // Send real-time notification
-    sendChurchNotification(campaign.churchId, 'campaign-approved', {
+    sendChurchNotification(campaign.churchId, "campaign-approved", {
       campaignId: campaign._id,
       title: campaign.title,
-      approvedBy: req.user.id
+      approvedBy: req.user.id,
     });
 
     res.json({
       success: true,
       data: { campaign },
-      message: 'Campaign approved successfully'
+      message: "Campaign approved successfully",
     });
   } catch (error) {
-    console.error('Approve campaign error:', error);
+    console.error("Approve campaign error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to approve campaign' }
+      error: { message: "Failed to approve campaign" },
     });
   }
 };
@@ -376,14 +462,14 @@ const pauseCampaign = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
-    if (campaign.status !== 'active') {
+    if (campaign.status !== "active") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Campaign is not active' }
+        error: { message: "Campaign is not active" },
       });
     }
 
@@ -391,23 +477,23 @@ const pauseCampaign = async (req, res) => {
     await campaign.save();
 
     // Send real-time notification
-    sendChurchNotification(campaign.churchId, 'campaign-paused', {
+    sendChurchNotification(campaign.churchId, "campaign-paused", {
       campaignId: campaign._id,
       title: campaign.title,
       pausedBy: req.user.id,
-      reason
+      reason,
     });
 
     res.json({
       success: true,
       data: { campaign },
-      message: 'Campaign paused successfully'
+      message: "Campaign paused successfully",
     });
   } catch (error) {
-    console.error('Pause campaign error:', error);
+    console.error("Pause campaign error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to pause campaign' }
+      error: { message: "Failed to pause campaign" },
     });
   }
 };
@@ -423,14 +509,14 @@ const resumeCampaign = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
-    if (campaign.status !== 'paused') {
+    if (campaign.status !== "paused") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Campaign is not paused' }
+        error: { message: "Campaign is not paused" },
       });
     }
 
@@ -438,22 +524,22 @@ const resumeCampaign = async (req, res) => {
     await campaign.save();
 
     // Send real-time notification
-    sendChurchNotification(campaign.churchId, 'campaign-resumed', {
+    sendChurchNotification(campaign.churchId, "campaign-resumed", {
       campaignId: campaign._id,
       title: campaign.title,
-      resumedBy: req.user.id
+      resumedBy: req.user.id,
     });
 
     res.json({
       success: true,
       data: { campaign },
-      message: 'Campaign resumed successfully'
+      message: "Campaign resumed successfully",
     });
   } catch (error) {
-    console.error('Resume campaign error:', error);
+    console.error("Resume campaign error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to resume campaign' }
+      error: { message: "Failed to resume campaign" },
     });
   }
 };
@@ -470,14 +556,14 @@ const cancelCampaign = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
-    if (campaign.status === 'completed' || campaign.status === 'cancelled') {
+    if (campaign.status === "completed" || campaign.status === "cancelled") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Campaign cannot be cancelled' }
+        error: { message: "Campaign cannot be cancelled" },
       });
     }
 
@@ -485,23 +571,23 @@ const cancelCampaign = async (req, res) => {
     await campaign.save();
 
     // Send real-time notification
-    sendChurchNotification(campaign.churchId, 'campaign-cancelled', {
+    sendChurchNotification(campaign.churchId, "campaign-cancelled", {
       campaignId: campaign._id,
       title: campaign.title,
       cancelledBy: req.user.id,
-      reason
+      reason,
     });
 
     res.json({
       success: true,
       data: { campaign },
-      message: 'Campaign cancelled successfully'
+      message: "Campaign cancelled successfully",
     });
   } catch (error) {
-    console.error('Cancel campaign error:', error);
+    console.error("Cancel campaign error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to cancel campaign' }
+      error: { message: "Failed to cancel campaign" },
     });
   }
 };
@@ -511,14 +597,15 @@ const cancelCampaign = async (req, res) => {
 // @access  Private (Church Admin)
 const addImage = async (req, res) => {
   try {
-    const { filename, originalName, mimetype, size, url, caption, isPrimary } = req.body;
+    const { filename, originalName, mimetype, size, url, caption, isPrimary } =
+      req.body;
     const campaignId = req.params.id;
 
     const campaign = await DonationCampaign.findById(campaignId);
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -531,12 +618,12 @@ const addImage = async (req, res) => {
       caption,
       isPrimary: isPrimary || false,
       uploadedAt: new Date(),
-      uploadedBy: req.user.id
+      uploadedBy: req.user.id,
     };
 
     // If this is primary image, unset others
     if (isPrimary) {
-      campaign.images.forEach(img => img.isPrimary = false);
+      campaign.images.forEach((img) => (img.isPrimary = false));
     }
 
     campaign.images.push(image);
@@ -545,13 +632,13 @@ const addImage = async (req, res) => {
     res.status(201).json({
       success: true,
       data: { image },
-      message: 'Image added successfully'
+      message: "Image added successfully",
     });
   } catch (error) {
-    console.error('Add image error:', error);
+    console.error("Add image error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to add image' }
+      error: { message: "Failed to add image" },
     });
   }
 };
@@ -567,7 +654,7 @@ const removeImage = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -575,7 +662,7 @@ const removeImage = async (req, res) => {
     if (!image) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Image not found' }
+        error: { message: "Image not found" },
       });
     }
 
@@ -584,13 +671,13 @@ const removeImage = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Image removed successfully'
+      message: "Image removed successfully",
     });
   } catch (error) {
-    console.error('Remove image error:', error);
+    console.error("Remove image error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to remove image' }
+      error: { message: "Failed to remove image" },
     });
   }
 };
@@ -600,14 +687,23 @@ const removeImage = async (req, res) => {
 // @access  Private (Church Admin)
 const addVideo = async (req, res) => {
   try {
-    const { filename, originalName, mimetype, size, url, thumbnail, duration, caption } = req.body;
+    const {
+      filename,
+      originalName,
+      mimetype,
+      size,
+      url,
+      thumbnail,
+      duration,
+      caption,
+    } = req.body;
     const campaignId = req.params.id;
 
     const campaign = await DonationCampaign.findById(campaignId);
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -621,7 +717,7 @@ const addVideo = async (req, res) => {
       duration,
       caption,
       uploadedAt: new Date(),
-      uploadedBy: req.user.id
+      uploadedBy: req.user.id,
     };
 
     campaign.video = video;
@@ -630,13 +726,13 @@ const addVideo = async (req, res) => {
     res.status(201).json({
       success: true,
       data: { video },
-      message: 'Video added successfully'
+      message: "Video added successfully",
     });
   } catch (error) {
-    console.error('Add video error:', error);
+    console.error("Add video error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to add video' }
+      error: { message: "Failed to add video" },
     });
   }
 };
@@ -652,7 +748,7 @@ const removeVideo = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -661,13 +757,13 @@ const removeVideo = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Video removed successfully'
+      message: "Video removed successfully",
     });
   } catch (error) {
-    console.error('Remove video error:', error);
+    console.error("Remove video error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to remove video' }
+      error: { message: "Failed to remove video" },
     });
   }
 };
@@ -684,7 +780,7 @@ const addUpdate = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -693,7 +789,7 @@ const addUpdate = async (req, res) => {
       content,
       isPublic: isPublic !== undefined ? isPublic : true,
       date: new Date(),
-      author: req.user.id
+      author: req.user.id,
     };
 
     campaign.updates.push(update);
@@ -701,24 +797,24 @@ const addUpdate = async (req, res) => {
 
     // Send real-time notification if public
     if (update.isPublic) {
-      sendChurchNotification(campaign.churchId, 'campaign-update', {
+      sendChurchNotification(campaign.churchId, "campaign-update", {
         campaignId: campaign._id,
         title: campaign.title,
         updateTitle: update.title,
-        updatedBy: req.user.id
+        updatedBy: req.user.id,
       });
     }
 
     res.status(201).json({
       success: true,
       data: { update },
-      message: 'Update added successfully'
+      message: "Update added successfully",
     });
   } catch (error) {
-    console.error('Add update error:', error);
+    console.error("Add update error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to add update' }
+      error: { message: "Failed to add update" },
     });
   }
 };
@@ -735,7 +831,7 @@ const addMilestone = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -745,7 +841,7 @@ const addMilestone = async (req, res) => {
       targetAmount,
       reward,
       date: new Date(),
-      addedBy: req.user.id
+      addedBy: req.user.id,
     };
 
     campaign.milestones.push(milestone);
@@ -754,13 +850,13 @@ const addMilestone = async (req, res) => {
     res.status(201).json({
       success: true,
       data: { milestone },
-      message: 'Milestone added successfully'
+      message: "Milestone added successfully",
     });
   } catch (error) {
-    console.error('Add milestone error:', error);
+    console.error("Add milestone error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to add milestone' }
+      error: { message: "Failed to add milestone" },
     });
   }
 };
@@ -777,7 +873,7 @@ const updateSocialSharing = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -792,13 +888,13 @@ const updateSocialSharing = async (req, res) => {
     res.json({
       success: true,
       data: { socialSharing: campaign.socialSharing },
-      message: 'Social sharing settings updated successfully'
+      message: "Social sharing settings updated successfully",
     });
   } catch (error) {
-    console.error('Update social sharing error:', error);
+    console.error("Update social sharing error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update social sharing settings' }
+      error: { message: "Failed to update social sharing settings" },
     });
   }
 };
@@ -815,14 +911,15 @@ const updateDonorWall = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
     // Update donor wall settings
     if (enabled !== undefined) campaign.donorWall.enabled = enabled;
     if (showAmounts !== undefined) campaign.donorWall.showAmounts = showAmounts;
-    if (showAnonymous !== undefined) campaign.donorWall.showAnonymous = showAnonymous;
+    if (showAnonymous !== undefined)
+      campaign.donorWall.showAnonymous = showAnonymous;
     if (customMessage) campaign.donorWall.customMessage = customMessage;
 
     await campaign.save();
@@ -830,13 +927,13 @@ const updateDonorWall = async (req, res) => {
     res.json({
       success: true,
       data: { donorWall: campaign.donorWall },
-      message: 'Donor wall settings updated successfully'
+      message: "Donor wall settings updated successfully",
     });
   } catch (error) {
-    console.error('Update donor wall error:', error);
+    console.error("Update donor wall error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update donor wall settings' }
+      error: { message: "Failed to update donor wall settings" },
     });
   }
 };
@@ -846,14 +943,15 @@ const updateDonorWall = async (req, res) => {
 // @access  Private (Church Admin)
 const updateSettings = async (req, res) => {
   try {
-    const { anonymous, recurring, minAmount, maxAmount, autoClose, comments } = req.body;
+    const { anonymous, recurring, minAmount, maxAmount, autoClose, comments } =
+      req.body;
     const campaignId = req.params.id;
 
     const campaign = await DonationCampaign.findById(campaignId);
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -870,13 +968,13 @@ const updateSettings = async (req, res) => {
     res.json({
       success: true,
       data: { settings: campaign.settings },
-      message: 'Campaign settings updated successfully'
+      message: "Campaign settings updated successfully",
     });
   } catch (error) {
-    console.error('Update settings error:', error);
+    console.error("Update settings error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update campaign settings' }
+      error: { message: "Failed to update campaign settings" },
     });
   }
 };
@@ -893,7 +991,7 @@ const incrementShareCount = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -909,13 +1007,13 @@ const incrementShareCount = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Share count incremented successfully'
+      message: "Share count incremented successfully",
     });
   } catch (error) {
-    console.error('Increment share count error:', error);
+    console.error("Increment share count error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to increment share count' }
+      error: { message: "Failed to increment share count" },
     });
   }
 };
@@ -927,21 +1025,24 @@ const getFeaturedCampaigns = async (req, res) => {
   try {
     const { limit = 5 } = req.query;
 
-    const campaigns = await DonationCampaign.find({ isFeatured: true, status: 'active' })
-      .populate('churchId', 'name logo')
-      .populate('createdBy', 'firstName lastName')
+    const campaigns = await DonationCampaign.find({
+      isFeatured: true,
+      status: "active",
+    })
+      .populate("churchId", "name logo")
+      .populate("createdBy", "firstName lastName")
       .limit(parseInt(limit))
       .sort({ createdAt: -1 });
 
     res.json({
       success: true,
-      data: { campaigns }
+      data: { campaigns },
     });
   } catch (error) {
-    console.error('Get featured campaigns error:', error);
+    console.error("Get featured campaigns error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get featured campaigns' }
+      error: { message: "Failed to get featured campaigns" },
     });
   }
 };
@@ -953,21 +1054,24 @@ const getUrgentCampaigns = async (req, res) => {
   try {
     const { limit = 5 } = req.query;
 
-    const campaigns = await DonationCampaign.find({ isUrgent: true, status: 'active' })
-      .populate('churchId', 'name logo')
-      .populate('createdBy', 'firstName lastName')
+    const campaigns = await DonationCampaign.find({
+      isUrgent: true,
+      status: "active",
+    })
+      .populate("churchId", "name logo")
+      .populate("createdBy", "firstName lastName")
       .limit(parseInt(limit))
       .sort({ endDate: 1 });
 
     res.json({
       success: true,
-      data: { campaigns }
+      data: { campaigns },
     });
   } catch (error) {
-    console.error('Get urgent campaigns error:', error);
+    console.error("Get urgent campaigns error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get urgent campaigns' }
+      error: { message: "Failed to get urgent campaigns" },
     });
   }
 };
@@ -988,8 +1092,8 @@ const getCampaignsByCategory = async (req, res) => {
     if (status) filter.status = status;
 
     const campaigns = await DonationCampaign.find(filter)
-      .populate('churchId', 'name logo')
-      .populate('createdBy', 'firstName lastName')
+      .populate("churchId", "name logo")
+      .populate("createdBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
@@ -1004,15 +1108,15 @@ const getCampaignsByCategory = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get campaigns by category error:', error);
+    console.error("Get campaigns by category error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get campaigns by category' }
+      error: { message: "Failed to get campaigns by category" },
     });
   }
 };
@@ -1028,7 +1132,7 @@ const getCampaignStats = async (req, res) => {
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
@@ -1036,13 +1140,339 @@ const getCampaignStats = async (req, res) => {
 
     res.json({
       success: true,
-      data: { stats }
+      data: { stats },
     });
   } catch (error) {
-    console.error('Get campaign stats error:', error);
+    console.error("Get campaign stats error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get campaign statistics' }
+      error: { message: "Failed to get campaign statistics" },
+    });
+  }
+};
+
+// @desc    Set image as primary
+// @route   POST /api/campaigns/:id/images/:filename/primary
+// @access  Private (Church Admin)
+const setPrimaryImage = async (req, res) => {
+  try {
+    const { id, filename } = req.params;
+
+    const campaign = await DonationCampaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Campaign not found" },
+      });
+    }
+
+    const imageIndex = campaign.images.findIndex(
+      (img) => img.filename === filename
+    );
+    if (imageIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Image not found" },
+      });
+    }
+
+    // Set all images as non-primary
+    campaign.images.forEach((img) => (img.isPrimary = false));
+
+    // Set the selected image as primary
+    campaign.images[imageIndex].isPrimary = true;
+
+    await campaign.save();
+
+    res.json({
+      success: true,
+      data: { image: campaign.images[imageIndex] },
+      message: "Primary image updated successfully",
+    });
+  } catch (error) {
+    console.error("Set primary image error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to set primary image" },
+    });
+  }
+};
+
+// @desc    Update campaign update
+// @route   PUT /api/campaigns/:id/updates/:updateId
+// @access  Private (Church Admin)
+const updateUpdate = async (req, res) => {
+  try {
+    const { id, updateId } = req.params;
+    const { title, content, isPublic } = req.body;
+
+    const campaign = await DonationCampaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Campaign not found" },
+      });
+    }
+
+    const updateIndex = campaign.updates.findIndex(
+      (u) => u._id.toString() === updateId
+    );
+    if (updateIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Update not found" },
+      });
+    }
+
+    if (title) campaign.updates[updateIndex].title = title;
+    if (content) campaign.updates[updateIndex].content = content;
+    if (isPublic !== undefined)
+      campaign.updates[updateIndex].isPublic = isPublic;
+
+    await campaign.save();
+
+    res.json({
+      success: true,
+      data: { update: campaign.updates[updateIndex] },
+      message: "Update modified successfully",
+    });
+  } catch (error) {
+    console.error("Update campaign update error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to update campaign update" },
+    });
+  }
+};
+
+// @desc    Delete campaign update
+// @route   DELETE /api/campaigns/:id/updates/:updateId
+// @access  Private (Church Admin)
+const deleteUpdate = async (req, res) => {
+  try {
+    const { id, updateId } = req.params;
+
+    const campaign = await DonationCampaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Campaign not found" },
+      });
+    }
+
+    const updateIndex = campaign.updates.findIndex(
+      (u) => u._id.toString() === updateId
+    );
+    if (updateIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Update not found" },
+      });
+    }
+
+    campaign.updates.splice(updateIndex, 1);
+    await campaign.save();
+
+    res.json({
+      success: true,
+      message: "Update deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete campaign update error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to delete campaign update" },
+    });
+  }
+};
+
+// @desc    Update campaign milestone
+// @route   PUT /api/campaigns/:id/milestones/:milestoneId
+// @access  Private (Church Admin)
+const updateMilestone = async (req, res) => {
+  try {
+    const { id, milestoneId } = req.params;
+    const { title, description, targetAmount, isReached } = req.body;
+
+    const campaign = await DonationCampaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Campaign not found" },
+      });
+    }
+
+    const milestoneIndex = campaign.milestones.findIndex(
+      (m) => m._id.toString() === milestoneId
+    );
+    if (milestoneIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Milestone not found" },
+      });
+    }
+
+    if (title) campaign.milestones[milestoneIndex].title = title;
+    if (description)
+      campaign.milestones[milestoneIndex].description = description;
+    if (targetAmount)
+      campaign.milestones[milestoneIndex].targetAmount = targetAmount;
+    if (isReached !== undefined)
+      campaign.milestones[milestoneIndex].isReached = isReached;
+
+    await campaign.save();
+
+    res.json({
+      success: true,
+      data: { milestone: campaign.milestones[milestoneIndex] },
+      message: "Milestone updated successfully",
+    });
+  } catch (error) {
+    console.error("Update milestone error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to update milestone" },
+    });
+  }
+};
+
+// @desc    Delete campaign milestone
+// @route   DELETE /api/campaigns/:id/milestones/:milestoneId
+// @access  Private (Church Admin)
+const deleteMilestone = async (req, res) => {
+  try {
+    const { id, milestoneId } = req.params;
+
+    const campaign = await DonationCampaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Campaign not found" },
+      });
+    }
+
+    const milestoneIndex = campaign.milestones.findIndex(
+      (m) => m._id.toString() === milestoneId
+    );
+    if (milestoneIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Milestone not found" },
+      });
+    }
+
+    campaign.milestones.splice(milestoneIndex, 1);
+    await campaign.save();
+
+    res.json({
+      success: true,
+      message: "Milestone deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete milestone error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to delete milestone" },
+    });
+  }
+};
+
+// @desc    Increment page view
+// @route   POST /api/campaigns/:id/pageview
+// @access  Public
+const incrementPageView = async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+
+    const campaign = await DonationCampaign.findById(campaignId);
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Campaign not found" },
+      });
+    }
+
+    campaign.analytics.pageViews += 1;
+    await campaign.save();
+
+    res.json({
+      success: true,
+      message: "Page view incremented successfully",
+    });
+  } catch (error) {
+    console.error("Increment page view error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to increment page view" },
+    });
+  }
+};
+
+// @desc    Export campaigns
+// @route   GET /api/campaigns/export
+// @access  Private (Church Admin)
+const exportCampaigns = async (req, res) => {
+  try {
+    const { churchId, format = "json" } = req.query;
+
+    const filter = {};
+    if (churchId) filter.churchId = churchId;
+
+    const campaigns = await DonationCampaign.find(filter)
+      .populate("churchId", "name")
+      .populate("createdBy", "firstName lastName");
+
+    if (format === "csv") {
+      // Convert to CSV format
+      const csvData = campaigns.map((campaign) => ({
+        "Campaign ID": campaign._id,
+        Title: campaign.title,
+        Description: campaign.description,
+        Category: campaign.category,
+        "Target Amount": campaign.targetAmount,
+        "Current Amount": campaign.currentAmount,
+        Progress: `${campaign.progressPercentage}%`,
+        "Start Date": campaign.startDate,
+        "End Date": campaign.endDate,
+        Status: campaign.status,
+        Featured: campaign.isFeatured ? "Yes" : "No",
+        Urgent: campaign.isUrgent ? "Yes" : "No",
+        "Total Donors": campaign.analytics.totalDonors,
+        "Total Donations": campaign.analytics.totalDonations,
+        "Page Views": campaign.analytics.pageViews,
+        "Total Shares": campaign.analytics.totalShares,
+        "Created By": `${campaign.createdBy?.firstName} ${campaign.createdBy?.lastName}`,
+        "Created At": campaign.createdAt,
+      }));
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=campaigns.csv"
+      );
+
+      // Convert to CSV string
+      const csvString = [
+        Object.keys(csvData[0]).join(","),
+        ...csvData.map((row) =>
+          Object.values(row)
+            .map((value) => `"${value}"`)
+            .join(",")
+        ),
+      ].join("\n");
+
+      res.send(csvString);
+    } else {
+      res.json({
+        success: true,
+        data: { campaigns },
+      });
+    }
+  } catch (error) {
+    console.error("Export campaigns error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to export campaigns" },
     });
   }
 };
@@ -1052,64 +1482,73 @@ const getCampaignStats = async (req, res) => {
 // @access  Private (Church Members)
 const exportCampaign = async (req, res) => {
   try {
-    const { format = 'json' } = req.query;
+    const { format = "json" } = req.query;
     const campaignId = req.params.id;
 
     const campaign = await DonationCampaign.findById(campaignId)
-      .populate('churchId', 'name')
-      .populate('createdBy', 'firstName lastName');
+      .populate("churchId", "name")
+      .populate("createdBy", "firstName lastName");
 
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Campaign not found' }
+        error: { message: "Campaign not found" },
       });
     }
 
-    if (format === 'csv') {
+    if (format === "csv") {
       // Convert to CSV format
-      const csvData = [{
-        'Campaign ID': campaign._id,
-        'Title': campaign.title,
-        'Description': campaign.description,
-        'Category': campaign.category,
-        'Target Amount': campaign.targetAmount,
-        'Current Amount': campaign.currentAmount,
-        'Progress': `${campaign.progressPercentage}%`,
-        'Start Date': campaign.startDate,
-        'End Date': campaign.endDate,
-        'Status': campaign.status,
-        'Featured': campaign.isFeatured ? 'Yes' : 'No',
-        'Urgent': campaign.isUrgent ? 'Yes' : 'No',
-        'Total Donors': campaign.analytics.totalDonors,
-        'Total Donations': campaign.analytics.totalDonations,
-        'Page Views': campaign.analytics.pageViews,
-        'Total Shares': campaign.analytics.totalShares,
-        'Created By': `${campaign.createdBy?.firstName} ${campaign.createdBy?.lastName}`,
-        'Created At': campaign.createdAt
-      }];
+      const csvData = [
+        {
+          "Campaign ID": campaign._id,
+          Title: campaign.title,
+          Description: campaign.description,
+          Category: campaign.category,
+          "Target Amount": campaign.targetAmount,
+          "Current Amount": campaign.currentAmount,
+          Progress: `${campaign.progressPercentage}%`,
+          "Start Date": campaign.startDate,
+          "End Date": campaign.endDate,
+          Status: campaign.status,
+          Featured: campaign.isFeatured ? "Yes" : "No",
+          Urgent: campaign.isUrgent ? "Yes" : "No",
+          "Total Donors": campaign.analytics.totalDonors,
+          "Total Donations": campaign.analytics.totalDonations,
+          "Page Views": campaign.analytics.pageViews,
+          "Total Shares": campaign.analytics.totalShares,
+          "Created By": `${campaign.createdBy?.firstName} ${campaign.createdBy?.lastName}`,
+          "Created At": campaign.createdAt,
+        },
+      ];
 
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename=campaign-${campaign._id}.csv`);
-      
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=campaign-${campaign._id}.csv`
+      );
+
       // Convert to CSV string
       const csvString = [
-        Object.keys(csvData[0]).join(','),
-        ...csvData.map(row => Object.values(row).map(value => `"${value}"`).join(','))
-      ].join('\n');
+        Object.keys(csvData[0]).join(","),
+        ...csvData.map((row) =>
+          Object.values(row)
+            .map((value) => `"${value}"`)
+            .join(",")
+        ),
+      ].join("\n");
 
       res.send(csvString);
     } else {
       res.json({
         success: true,
-        data: { campaign }
+        data: { campaign },
       });
     }
   } catch (error) {
-    console.error('Export campaign error:', error);
+    console.error("Export campaign error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to export campaign' }
+      error: { message: "Failed to export campaign" },
     });
   }
 };
@@ -1117,6 +1556,7 @@ const exportCampaign = async (req, res) => {
 module.exports = {
   createCampaign,
   getAllCampaigns,
+  getCampaignsByChurch,
   searchCampaigns,
   getCampaignById,
   updateCampaign,
@@ -1127,17 +1567,24 @@ module.exports = {
   cancelCampaign,
   addImage,
   removeImage,
+  setPrimaryImage,
   addVideo,
   removeVideo,
   addUpdate,
+  updateUpdate,
+  deleteUpdate,
   addMilestone,
+  updateMilestone,
+  deleteMilestone,
   updateSocialSharing,
   updateDonorWall,
   updateSettings,
   incrementShareCount,
+  incrementPageView,
   getFeaturedCampaigns,
   getUrgentCampaigns,
   getCampaignsByCategory,
   getCampaignStats,
-  exportCampaign
+  exportCampaign,
+  exportCampaigns,
 };

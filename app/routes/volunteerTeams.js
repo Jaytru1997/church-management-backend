@@ -183,7 +183,7 @@ router.post(
       .withMessage("Availability must be an array"),
     handleValidationErrors,
   ],
-  volunteerTeamController.addMember
+  volunteerTeamController.addMemberToTeam
 );
 
 // @route   PUT /api/volunteer-teams/:id/members/:memberId
@@ -207,7 +207,7 @@ router.put(
       .withMessage("Availability must be an array"),
     handleValidationErrors,
   ],
-  volunteerTeamController.updateMember
+  volunteerTeamController.updateMemberRole
 );
 
 // @route   DELETE /api/volunteer-teams/:id/members/:memberId
@@ -216,7 +216,7 @@ router.put(
 router.delete(
   "/:id/members/:memberId",
   [protect, validateObjectId("id"), checkResourceAccess(VolunteerTeam)],
-  volunteerTeamController.removeMember
+  volunteerTeamController.removeMemberFromTeam
 );
 
 // @route   POST /api/volunteer-teams/:id/schedule
@@ -433,7 +433,7 @@ router.put(
       .withMessage("Maximum age cannot be negative"),
     handleValidationErrors,
   ],
-  volunteerTeamController.updateRequirements
+  volunteerTeamController.updateTeamRequirements
 );
 
 // @route   GET /api/volunteer-teams/:id/available-members
@@ -451,7 +451,7 @@ router.get(
 router.get(
   "/:id/performance",
   [protect, validateObjectId("id"), checkResourceAccess(VolunteerTeam)],
-  volunteerTeamController.getTeamPerformance
+  volunteerTeamController.evaluateTeamPerformance
 );
 
 // @route   POST /api/volunteer-teams/:id/evaluate
@@ -488,7 +488,7 @@ router.get(
 router.get(
   "/upcoming-schedules/church/:churchId",
   [protect, checkChurchAccess],
-  volunteerTeamController.getTeamsWithUpcomingSchedules
+  volunteerTeamController.getUpcomingSchedules
 );
 
 // @route   GET /api/volunteer-teams/today-schedules/church/:churchId
@@ -497,7 +497,7 @@ router.get(
 router.get(
   "/today-schedules/church/:churchId",
   [protect, checkChurchAccess],
-  volunteerTeamController.getTeamsWithTodaySchedules
+  volunteerTeamController.getTodaySchedules
 );
 
 // @route   POST /api/volunteer-teams/bulk-import

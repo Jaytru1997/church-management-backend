@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const nodemailer = require("nodemailer");
 
 class EmailService {
   constructor() {
@@ -7,9 +7,9 @@ class EmailService {
   }
 
   initializeTransporter() {
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === "production") {
       // Production email configuration
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         host: process.env.MAIL_HOST,
         port: process.env.MAIL_PORT,
         secure: false, // true for 465, false for other ports
@@ -20,7 +20,7 @@ class EmailService {
       });
     } else {
       // Development email configuration (Mailtrap)
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         host: process.env.MAILTRAP_HOST,
         port: process.env.MAILTRAP_PORT,
         auth: {
@@ -60,13 +60,19 @@ class EmailService {
       console.log(`✅ Welcome email sent to ${userEmail}`);
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error('❌ Error sending welcome email:', error);
+      console.error("❌ Error sending welcome email:", error);
       return { success: false, error: error.message };
     }
   }
 
   // Send donation confirmation email
-  async sendDonationConfirmation(donorEmail, donorName, amount, churchName, donationType) {
+  async sendDonationConfirmation(
+    donorEmail,
+    donorName,
+    amount,
+    churchName,
+    donationType
+  ) {
     try {
       const mailOptions = {
         from: `"${process.env.MAIL_DISPLAYNAME}" <${process.env.MAIL_ADDR || process.env.MAILTRAP_USERNAME}>`,
@@ -92,13 +98,19 @@ class EmailService {
       console.log(`✅ Donation confirmation email sent to ${donorEmail}`);
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error('❌ Error sending donation confirmation email:', error);
+      console.error("❌ Error sending donation confirmation email:", error);
       return { success: false, error: error.message };
     }
   }
 
   // Send event reminder email
-  async sendEventReminder(memberEmail, memberName, eventName, eventDate, churchName) {
+  async sendEventReminder(
+    memberEmail,
+    memberName,
+    eventName,
+    eventDate,
+    churchName
+  ) {
     try {
       const mailOptions = {
         from: `"${process.env.MAIL_DISPLAYNAME}" <${process.env.MAIL_ADDR || process.env.MAILTRAP_USERNAME}>`,
@@ -124,7 +136,7 @@ class EmailService {
       console.log(`✅ Event reminder email sent to ${memberEmail}`);
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error('❌ Error sending event reminder email:', error);
+      console.error("❌ Error sending event reminder email:", error);
       return { success: false, error: error.message };
     }
   }
@@ -133,11 +145,11 @@ class EmailService {
   async sendPasswordResetEmail(userEmail, resetToken, userName) {
     try {
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-      
+
       const mailOptions = {
         from: `"${process.env.MAIL_DISPLAYNAME}" <${process.env.MAIL_ADDR || process.env.MAILTRAP_USERNAME}>`,
         to: userEmail,
-        subject: 'Password Reset Request - Church Management System',
+        subject: "Password Reset Request - Church Management System",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #e74c3c;">Password Reset Request</h2>
@@ -157,16 +169,23 @@ class EmailService {
       console.log(`✅ Password reset email sent to ${userEmail}`);
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error('❌ Error sending password reset email:', error);
+      console.error("❌ Error sending password reset email:", error);
       return { success: false, error: error.message };
     }
   }
 
   // Send campaign update email
-  async sendCampaignUpdate(donorEmail, donorName, campaignName, currentAmount, targetAmount, churchName) {
+  async sendCampaignUpdate(
+    donorEmail,
+    donorName,
+    campaignName,
+    currentAmount,
+    targetAmount,
+    churchName
+  ) {
     try {
       const progress = Math.round((currentAmount / targetAmount) * 100);
-      
+
       const mailOptions = {
         from: `"${process.env.MAIL_DISPLAYNAME}" <${process.env.MAIL_ADDR || process.env.MAILTRAP_USERNAME}>`,
         to: donorEmail,
@@ -195,7 +214,7 @@ class EmailService {
       console.log(`✅ Campaign update email sent to ${donorEmail}`);
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error('❌ Error sending campaign update email:', error);
+      console.error("❌ Error sending campaign update email:", error);
       return { success: false, error: error.message };
     }
   }

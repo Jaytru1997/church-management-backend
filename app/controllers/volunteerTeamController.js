@@ -1,21 +1,25 @@
-const VolunteerTeam = require('../models/VolunteerTeam');
-const Member = require('../models/Member');
-const Church = require('../models/Church');
-const { sendTeamNotification, sendChurchNotification } = require('../../config/pusher');
+const VolunteerTeam = require("../models/VolunteerTeam");
+const Member = require("../models/Member");
+const Church = require("../models/Church");
+const {
+  sendTeamNotification,
+  sendChurchNotification,
+} = require("../../config/pusher");
 
 // @desc    Create a new volunteer team
 // @route   POST /api/volunteer-teams
 // @access  Private (Church Members)
 const createVolunteerTeam = async (req, res) => {
   try {
-    const { churchId, name, description, category, leader, requirements } = req.body;
+    const { churchId, name, description, category, leader, requirements } =
+      req.body;
 
     // Check if team name already exists in this church
     const existingTeam = await VolunteerTeam.findOne({ churchId, name });
     if (existingTeam) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Team name already exists in this church' }
+        error: { message: "Team name already exists in this church" },
       });
     }
 
@@ -26,26 +30,80 @@ const createVolunteerTeam = async (req, res) => {
       description,
       category,
       leader,
-      requirements
+      requirements,
     });
 
     // Send real-time notification
-    sendChurchNotification(churchId, 'team-created', {
+    sendChurchNotification(churchId, "team-created", {
       teamId: team._id,
       teamName: team.name,
-      createdBy: req.user.id
+      createdBy: req.user.id,
     });
 
     res.status(201).json({
       success: true,
       data: { team },
-      message: 'Volunteer team created successfully'
+      message: "Volunteer team created successfully",
     });
   } catch (error) {
-    console.error('Create volunteer team error:', error);
+    console.error("Create volunteer team error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to create volunteer team' }
+      error: { message: "Failed to create volunteer team" },
+    });
+  }
+};
+
+// @desc    Get volunteer teams by church
+// @route   GET /api/volunteer-teams/church/:churchId
+// @access  Private (Church Members)
+const getVolunteerTeamsByChurch = async (req, res) => {
+  try {
+    const { churchId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const { category, isActive, search } = req.query;
+    const filter = { churchId };
+
+    if (category) filter.category = category;
+    if (isActive !== undefined) filter.isActive = isActive === "true";
+
+    // Text search
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const teams = await VolunteerTeam.find(filter)
+      .populate("leader.userId", "firstName lastName email")
+      .populate("churchId", "name")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    const total = await VolunteerTeam.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: {
+        teams,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get volunteer teams by church error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to get volunteer teams" },
     });
   }
 };
@@ -64,19 +122,19 @@ const getAllVolunteerTeams = async (req, res) => {
 
     if (churchId) filter.churchId = churchId;
     if (category) filter.category = category;
-    if (isActive !== undefined) filter.isActive = isActive === 'true';
+    if (isActive !== undefined) filter.isActive = isActive === "true";
 
     // Text search
     if (search) {
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
       ];
     }
 
     const teams = await VolunteerTeam.find(filter)
-      .populate('leader.userId', 'firstName lastName email')
-      .populate('churchId', 'name')
+      .populate("leader.userId", "firstName lastName email")
+      .populate("churchId", "name")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
@@ -91,15 +149,15 @@ const getAllVolunteerTeams = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get all volunteer teams error:', error);
+    console.error("Get all volunteer teams error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get volunteer teams' }
+      error: { message: "Failed to get volunteer teams" },
     });
   }
 };
@@ -110,26 +168,26 @@ const getAllVolunteerTeams = async (req, res) => {
 const getVolunteerTeamById = async (req, res) => {
   try {
     const team = await VolunteerTeam.findById(req.params.id)
-      .populate('leader.userId', 'firstName lastName email phone')
-      .populate('members.memberId', 'firstName lastName email phone')
-      .populate('churchId', 'name');
+      .populate("leader.userId", "firstName lastName email phone")
+      .populate("members.memberId", "firstName lastName email phone")
+      .populate("churchId", "name");
 
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
     res.json({
       success: true,
-      data: { team }
+      data: { team },
     });
   } catch (error) {
-    console.error('Get volunteer team by ID error:', error);
+    console.error("Get volunteer team by ID error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get volunteer team' }
+      error: { message: "Failed to get volunteer team" },
     });
   }
 };
@@ -146,7 +204,7 @@ const updateVolunteerTeam = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -154,27 +212,28 @@ const updateVolunteerTeam = async (req, res) => {
     if (name) team.name = name;
     if (description) team.description = description;
     if (category) team.category = category;
-    if (requirements) team.requirements = { ...team.requirements, ...requirements };
+    if (requirements)
+      team.requirements = { ...team.requirements, ...requirements };
 
     await team.save();
 
     // Send real-time notification
-    sendTeamNotification(teamId, 'team-updated', {
+    sendTeamNotification(teamId, "team-updated", {
       teamId: team._id,
       teamName: team.name,
-      updatedBy: req.user.id
+      updatedBy: req.user.id,
     });
 
     res.json({
       success: true,
       data: { team },
-      message: 'Volunteer team updated successfully'
+      message: "Volunteer team updated successfully",
     });
   } catch (error) {
-    console.error('Update volunteer team error:', error);
+    console.error("Update volunteer team error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update volunteer team' }
+      error: { message: "Failed to update volunteer team" },
     });
   }
 };
@@ -190,34 +249,34 @@ const deleteVolunteerTeam = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
     // Remove team from all members
     await Member.updateMany(
-      { 'volunteerTeams.teamId': teamId },
+      { "volunteerTeams.teamId": teamId },
       { $pull: { volunteerTeams: { teamId } } }
     );
 
     await VolunteerTeam.findByIdAndDelete(teamId);
 
     // Send real-time notification
-    sendChurchNotification(team.churchId, 'team-deleted', {
+    sendChurchNotification(team.churchId, "team-deleted", {
       teamId: team._id,
       teamName: team.name,
-      deletedBy: req.user.id
+      deletedBy: req.user.id,
     });
 
     res.json({
       success: true,
-      message: 'Volunteer team deleted successfully'
+      message: "Volunteer team deleted successfully",
     });
   } catch (error) {
-    console.error('Delete volunteer team error:', error);
+    console.error("Delete volunteer team error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to delete volunteer team' }
+      error: { message: "Failed to delete volunteer team" },
     });
   }
 };
@@ -234,16 +293,18 @@ const addMemberToTeam = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
     // Check if member is already in the team
-    const existingMember = team.members.find(m => m.memberId.toString() === memberId);
+    const existingMember = team.members.find(
+      (m) => m.memberId.toString() === memberId
+    );
     if (existingMember) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Member is already in this team' }
+        error: { message: "Member is already in this team" },
       });
     }
 
@@ -253,7 +314,7 @@ const addMemberToTeam = async (req, res) => {
       role,
       skills,
       availability,
-      joinedAt: new Date()
+      joinedAt: new Date(),
     };
 
     team.addMember(memberData);
@@ -267,30 +328,30 @@ const addMemberToTeam = async (req, res) => {
         role,
         skills,
         availability,
-        joinedAt: new Date()
+        joinedAt: new Date(),
       });
       await member.save();
     }
 
     // Send real-time notification
-    sendTeamNotification(teamId, 'member-added', {
+    sendTeamNotification(teamId, "member-added", {
       teamId: team._id,
       teamName: team.name,
       memberId,
       role,
-      addedBy: req.user.id
+      addedBy: req.user.id,
     });
 
     res.status(201).json({
       success: true,
       data: { member: memberData },
-      message: 'Member added to team successfully'
+      message: "Member added to team successfully",
     });
   } catch (error) {
-    console.error('Add member to team error:', error);
+    console.error("Add member to team error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to add member to team' }
+      error: { message: "Failed to add member to team" },
     });
   }
 };
@@ -307,16 +368,16 @@ const updateMemberRole = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
     // Update member in team
-    const member = team.members.find(m => m.memberId.toString() === memberId);
+    const member = team.members.find((m) => m.memberId.toString() === memberId);
     if (!member) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Member not found in team' }
+        error: { message: "Member not found in team" },
       });
     }
 
@@ -328,26 +389,26 @@ const updateMemberRole = async (req, res) => {
 
     // Update member's volunteer team record
     await Member.updateOne(
-      { _id: memberId, 'volunteerTeams.teamId': teamId },
+      { _id: memberId, "volunteerTeams.teamId": teamId },
       {
         $set: {
-          'volunteerTeams.$.role': role || member.role,
-          'volunteerTeams.$.skills': skills || member.skills,
-          'volunteerTeams.$.availability': availability || member.availability
-        }
+          "volunteerTeams.$.role": role || member.role,
+          "volunteerTeams.$.skills": skills || member.skills,
+          "volunteerTeams.$.availability": availability || member.availability,
+        },
       }
     );
 
     res.json({
       success: true,
       data: { member },
-      message: 'Member role updated successfully'
+      message: "Member role updated successfully",
     });
   } catch (error) {
-    console.error('Update member role error:', error);
+    console.error("Update member role error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update member role' }
+      error: { message: "Failed to update member role" },
     });
   }
 };
@@ -363,16 +424,16 @@ const removeMemberFromTeam = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
     // Remove member from team
-    const member = team.members.find(m => m.memberId.toString() === memberId);
+    const member = team.members.find((m) => m.memberId.toString() === memberId);
     if (!member) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Member not found in team' }
+        error: { message: "Member not found in team" },
       });
     }
 
@@ -386,22 +447,22 @@ const removeMemberFromTeam = async (req, res) => {
     );
 
     // Send real-time notification
-    sendTeamNotification(teamId, 'member-removed', {
+    sendTeamNotification(teamId, "member-removed", {
       teamId: team._id,
       teamName: team.name,
       memberId,
-      removedBy: req.user.id
+      removedBy: req.user.id,
     });
 
     res.json({
       success: true,
-      message: 'Member removed from team successfully'
+      message: "Member removed from team successfully",
     });
   } catch (error) {
-    console.error('Remove member from team error:', error);
+    console.error("Remove member from team error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to remove member from team' }
+      error: { message: "Failed to remove member from team" },
     });
   }
 };
@@ -418,7 +479,7 @@ const addSchedule = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -428,32 +489,32 @@ const addSchedule = async (req, res) => {
       time,
       description,
       requiredMembers,
-      isActive: true
+      isActive: true,
     };
 
     team.schedule.push(schedule);
     await team.save();
 
     // Send real-time notification
-    sendTeamNotification(teamId, 'schedule-added', {
+    sendTeamNotification(teamId, "schedule-added", {
       teamId: team._id,
       teamName: team.name,
       serviceType,
       day,
       time,
-      addedBy: req.user.id
+      addedBy: req.user.id,
     });
 
     res.status(201).json({
       success: true,
       data: { schedule },
-      message: 'Schedule added successfully'
+      message: "Schedule added successfully",
     });
   } catch (error) {
-    console.error('Add schedule error:', error);
+    console.error("Add schedule error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to add schedule' }
+      error: { message: "Failed to add schedule" },
     });
   }
 };
@@ -463,14 +524,15 @@ const addSchedule = async (req, res) => {
 // @access  Private (Church Members)
 const updateSchedule = async (req, res) => {
   try {
-    const { serviceType, day, time, description, requiredMembers, isActive } = req.body;
+    const { serviceType, day, time, description, requiredMembers, isActive } =
+      req.body;
     const { id: teamId, scheduleId } = req.params;
 
     const team = await VolunteerTeam.findById(teamId);
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -478,7 +540,7 @@ const updateSchedule = async (req, res) => {
     if (!schedule) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Schedule not found' }
+        error: { message: "Schedule not found" },
       });
     }
 
@@ -487,21 +549,22 @@ const updateSchedule = async (req, res) => {
     if (day) schedule.day = day;
     if (time) schedule.time = time;
     if (description) schedule.description = description;
-    if (requiredMembers !== undefined) schedule.requiredMembers = requiredMembers;
-    if (typeof isActive === 'boolean') schedule.isActive = isActive;
+    if (requiredMembers !== undefined)
+      schedule.requiredMembers = requiredMembers;
+    if (typeof isActive === "boolean") schedule.isActive = isActive;
 
     await team.save();
 
     res.json({
       success: true,
       data: { schedule },
-      message: 'Schedule updated successfully'
+      message: "Schedule updated successfully",
     });
   } catch (error) {
-    console.error('Update schedule error:', error);
+    console.error("Update schedule error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update schedule' }
+      error: { message: "Failed to update schedule" },
     });
   }
 };
@@ -517,7 +580,7 @@ const removeSchedule = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -525,7 +588,7 @@ const removeSchedule = async (req, res) => {
     if (!schedule) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Schedule not found' }
+        error: { message: "Schedule not found" },
       });
     }
 
@@ -534,13 +597,13 @@ const removeSchedule = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Schedule removed successfully'
+      message: "Schedule removed successfully",
     });
   } catch (error) {
-    console.error('Remove schedule error:', error);
+    console.error("Remove schedule error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to remove schedule' }
+      error: { message: "Failed to remove schedule" },
     });
   }
 };
@@ -557,7 +620,7 @@ const assignMemberToSchedule = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -565,16 +628,18 @@ const assignMemberToSchedule = async (req, res) => {
     if (!schedule) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Schedule not found' }
+        error: { message: "Schedule not found" },
       });
     }
 
     // Check if member is already assigned
-    const existingAssignment = schedule.assignments.find(a => a.memberId.toString() === memberId);
+    const existingAssignment = schedule.assignments.find(
+      (a) => a.memberId.toString() === memberId
+    );
     if (existingAssignment) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Member is already assigned to this schedule' }
+        error: { message: "Member is already assigned to this schedule" },
       });
     }
 
@@ -582,7 +647,7 @@ const assignMemberToSchedule = async (req, res) => {
       memberId,
       role,
       assignedAt: new Date(),
-      assignedBy: req.user.id
+      assignedBy: req.user.id,
     };
 
     schedule.assignments.push(assignment);
@@ -591,13 +656,13 @@ const assignMemberToSchedule = async (req, res) => {
     res.status(201).json({
       success: true,
       data: { assignment },
-      message: 'Member assigned to schedule successfully'
+      message: "Member assigned to schedule successfully",
     });
   } catch (error) {
-    console.error('Assign member to schedule error:', error);
+    console.error("Assign member to schedule error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to assign member to schedule' }
+      error: { message: "Failed to assign member to schedule" },
     });
   }
 };
@@ -614,7 +679,7 @@ const updateTeamLeader = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -622,23 +687,23 @@ const updateTeamLeader = async (req, res) => {
     await team.save();
 
     // Send real-time notification
-    sendTeamNotification(teamId, 'leader-updated', {
+    sendTeamNotification(teamId, "leader-updated", {
       teamId: team._id,
       teamName: team.name,
       newLeader: { userId, name },
-      updatedBy: req.user.id
+      updatedBy: req.user.id,
     });
 
     res.json({
       success: true,
       data: { leader: team.leader },
-      message: 'Team leader updated successfully'
+      message: "Team leader updated successfully",
     });
   } catch (error) {
-    console.error('Update team leader error:', error);
+    console.error("Update team leader error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update team leader' }
+      error: { message: "Failed to update team leader" },
     });
   }
 };
@@ -655,7 +720,7 @@ const updateTeamRequirements = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -670,13 +735,13 @@ const updateTeamRequirements = async (req, res) => {
     res.json({
       success: true,
       data: { requirements: team.requirements },
-      message: 'Team requirements updated successfully'
+      message: "Team requirements updated successfully",
     });
   } catch (error) {
-    console.error('Update team requirements error:', error);
+    console.error("Update team requirements error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update team requirements' }
+      error: { message: "Failed to update team requirements" },
     });
   }
 };
@@ -693,7 +758,7 @@ const getAvailableMembers = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -701,31 +766,33 @@ const getAvailableMembers = async (req, res) => {
 
     // Filter by skills if specified
     if (skills) {
-      filter.skills = { $in: skills.split(',') };
+      filter.skills = { $in: skills.split(",") };
     }
 
     const members = await Member.find(filter)
-      .populate('userId', 'firstName lastName email phone')
-      .select('-attendance -notes');
+      .populate("userId", "firstName lastName email phone")
+      .select("-attendance -notes");
 
     // Filter by availability if specified
     let availableMembers = members;
     if (availability) {
-      availableMembers = members.filter(member => {
-        const memberTeam = member.volunteerTeams.find(t => t.teamId.toString() === teamId);
+      availableMembers = members.filter((member) => {
+        const memberTeam = member.volunteerTeams.find(
+          (t) => t.teamId.toString() === teamId
+        );
         return !memberTeam || memberTeam.availability.includes(availability);
       });
     }
 
     res.json({
       success: true,
-      data: { members: availableMembers }
+      data: { members: availableMembers },
     });
   } catch (error) {
-    console.error('Get available members error:', error);
+    console.error("Get available members error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get available members' }
+      error: { message: "Failed to get available members" },
     });
   }
 };
@@ -742,7 +809,7 @@ const evaluateTeamPerformance = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -751,7 +818,7 @@ const evaluateTeamPerformance = async (req, res) => {
       feedback,
       areas,
       evaluatedBy: req.user.id,
-      evaluatedAt: new Date()
+      evaluatedAt: new Date(),
     };
 
     team.performance.evaluations.push(evaluation);
@@ -760,13 +827,13 @@ const evaluateTeamPerformance = async (req, res) => {
     res.status(201).json({
       success: true,
       data: { evaluation },
-      message: 'Team performance evaluated successfully'
+      message: "Team performance evaluated successfully",
     });
   } catch (error) {
-    console.error('Evaluate team performance error:', error);
+    console.error("Evaluate team performance error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to evaluate team performance' }
+      error: { message: "Failed to evaluate team performance" },
     });
   }
 };
@@ -783,19 +850,19 @@ const getTeamsByCategory = async (req, res) => {
     if (churchId) filter.churchId = churchId;
 
     const teams = await VolunteerTeam.find(filter)
-      .populate('leader.userId', 'firstName lastName')
-      .populate('churchId', 'name')
+      .populate("leader.userId", "firstName lastName")
+      .populate("churchId", "name")
       .sort({ name: 1 });
 
     res.json({
       success: true,
-      data: { teams }
+      data: { teams },
     });
   } catch (error) {
-    console.error('Get teams by category error:', error);
+    console.error("Get teams by category error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get teams by category' }
+      error: { message: "Failed to get teams by category" },
     });
   }
 };
@@ -812,7 +879,7 @@ const getUpcomingSchedules = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -820,13 +887,222 @@ const getUpcomingSchedules = async (req, res) => {
 
     res.json({
       success: true,
-      data: { schedules: upcomingSchedules }
+      data: { schedules: upcomingSchedules },
     });
   } catch (error) {
-    console.error('Get upcoming schedules error:', error);
+    console.error("Get upcoming schedules error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get upcoming schedules' }
+      error: { message: "Failed to get upcoming schedules" },
+    });
+  }
+};
+
+// @desc    Update member assignment
+// @route   PUT /api/volunteer-teams/:id/schedule/:scheduleId/members/:memberId
+// @access  Private (Church Members)
+const updateMemberAssignment = async (req, res) => {
+  try {
+    const { id, scheduleId, memberId } = req.params;
+    const { status, notes } = req.body;
+
+    const team = await VolunteerTeam.findById(id);
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Volunteer team not found" },
+      });
+    }
+
+    const schedule = team.schedules.id(scheduleId);
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Schedule not found" },
+      });
+    }
+
+    const assignment = schedule.assignments.find(
+      (a) => a.memberId.toString() === memberId
+    );
+    if (!assignment) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Member assignment not found" },
+      });
+    }
+
+    if (status) assignment.status = status;
+    if (notes) assignment.notes = notes;
+
+    await team.save();
+
+    res.json({
+      success: true,
+      data: { assignment },
+      message: "Member assignment updated successfully",
+    });
+  } catch (error) {
+    console.error("Update member assignment error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to update member assignment" },
+    });
+  }
+};
+
+// @desc    Remove member assignment
+// @route   DELETE /api/volunteer-teams/:id/schedule/:scheduleId/members/:memberId
+// @access  Private (Church Members)
+const removeMemberAssignment = async (req, res) => {
+  try {
+    const { id, scheduleId, memberId } = req.params;
+
+    const team = await VolunteerTeam.findById(id);
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Volunteer team not found" },
+      });
+    }
+
+    const schedule = team.schedules.id(scheduleId);
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Schedule not found" },
+      });
+    }
+
+    schedule.assignments = schedule.assignments.filter(
+      (a) => a.memberId.toString() !== memberId
+    );
+
+    await team.save();
+
+    res.json({
+      success: true,
+      message: "Member assignment removed successfully",
+    });
+  } catch (error) {
+    console.error("Remove member assignment error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to remove member assignment" },
+    });
+  }
+};
+
+// @desc    Bulk import teams
+// @route   POST /api/volunteer-teams/bulk-import
+// @access  Private (Church Admin)
+const bulkImportTeams = async (req, res) => {
+  try {
+    const { churchId, teams } = req.body;
+
+    if (!teams || !Array.isArray(teams) || teams.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: "Teams array is required" },
+      });
+    }
+
+    const results = {
+      success: [],
+      errors: [],
+    };
+
+    for (const teamData of teams) {
+      try {
+        const team = await VolunteerTeam.create({
+          churchId,
+          ...teamData,
+        });
+        results.success.push(team);
+      } catch (error) {
+        results.errors.push({
+          data: teamData,
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: { results },
+      message: `Successfully imported ${results.success.length} teams`,
+    });
+  } catch (error) {
+    console.error("Bulk import teams error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to bulk import teams" },
+    });
+  }
+};
+
+// @desc    Evaluate team performance
+// @route   POST /api/volunteer-teams/:id/evaluate
+// @access  Private (Church Admin)
+const evaluatePerformance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { memberSatisfaction, notes } = req.body;
+
+    const team = await VolunteerTeam.findById(id);
+    if (!team) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Volunteer team not found" },
+      });
+    }
+
+    const evaluation = {
+      date: new Date(),
+      memberSatisfaction: memberSatisfaction || null,
+      notes: notes || "",
+      evaluatedBy: req.user.id,
+    };
+
+    team.performanceEvaluations = team.performanceEvaluations || [];
+    team.performanceEvaluations.push(evaluation);
+    await team.save();
+
+    res.status(201).json({
+      success: true,
+      data: { evaluation },
+      message: "Team performance evaluated successfully",
+    });
+  } catch (error) {
+    console.error("Evaluate performance error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to evaluate team performance" },
+    });
+  }
+};
+
+// @desc    Export teams
+// @route   GET /api/volunteer-teams/export
+// @access  Private (Church Admin)
+const exportTeams = async (req, res) => {
+  try {
+    const { churchId, format = "csv" } = req.query;
+
+    // In a real implementation, you would export teams to the specified format
+    // For now, we'll return a mock response
+    console.log("Exporting teams:", { churchId, format });
+
+    res.json({
+      success: true,
+      message: "Teams exported successfully",
+      data: { downloadUrl: "/exports/teams.csv" },
+    });
+  } catch (error) {
+    console.error("Export teams error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to export teams" },
     });
   }
 };
@@ -842,7 +1118,7 @@ const getTodaySchedules = async (req, res) => {
     if (!team) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Volunteer team not found' }
+        error: { message: "Volunteer team not found" },
       });
     }
 
@@ -850,13 +1126,13 @@ const getTodaySchedules = async (req, res) => {
 
     res.json({
       success: true,
-      data: { schedules: todaySchedules }
+      data: { schedules: todaySchedules },
     });
   } catch (error) {
-    console.error('Get today schedules error:', error);
+    console.error("Get today schedules error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get today schedules' }
+      error: { message: "Failed to get today schedules" },
     });
   }
 };
@@ -864,6 +1140,7 @@ const getTodaySchedules = async (req, res) => {
 module.exports = {
   createVolunteerTeam,
   getAllVolunteerTeams,
+  getVolunteerTeamsByChurch,
   getVolunteerTeamById,
   updateVolunteerTeam,
   deleteVolunteerTeam,
@@ -874,11 +1151,16 @@ module.exports = {
   updateSchedule,
   removeSchedule,
   assignMemberToSchedule,
+  updateMemberAssignment,
+  removeMemberAssignment,
   updateTeamLeader,
   updateTeamRequirements,
   getAvailableMembers,
   evaluateTeamPerformance,
   getTeamsByCategory,
   getUpcomingSchedules,
-  getTodaySchedules
+  getTodaySchedules,
+  bulkImportTeams,
+  exportTeams,
+  evaluatePerformance,
 };

@@ -1,20 +1,38 @@
-const ManualFinancialRecord = require('../models/ManualFinancialRecord');
-const Church = require('../models/Church');
-const { sendChurchNotification, sendUserNotification } = require('../../config/pusher');
+const ManualFinancialRecord = require("../models/ManualFinancialRecord");
+const Church = require("../models/Church");
+const {
+  sendChurchNotification,
+  sendUserNotification,
+} = require("../../config/pusher");
 
 // @desc    Create a new manual financial record
 // @route   POST /api/financial-records
 // @access  Private (Church Members)
 const createFinancialRecord = async (req, res) => {
   try {
-    const { churchId, recordType, title, description, amount, currency, category, subcategory, transactionDate, source, sourceDetails, donor, vendor, priority } = req.body;
+    const {
+      churchId,
+      recordType,
+      title,
+      description,
+      amount,
+      currency,
+      category,
+      subcategory,
+      transactionDate,
+      source,
+      sourceDetails,
+      donor,
+      vendor,
+      priority,
+    } = req.body;
 
     // Check if church exists
     const church = await Church.findById(churchId);
     if (!church) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Church not found' }
+        error: { message: "Church not found" },
       });
     }
 
@@ -25,7 +43,7 @@ const createFinancialRecord = async (req, res) => {
       title,
       description,
       amount,
-      currency: currency || church.settings?.currency || 'NGN',
+      currency: currency || church.settings?.currency || "NGN",
       category,
       subcategory,
       transactionDate: new Date(transactionDate),
@@ -34,28 +52,95 @@ const createFinancialRecord = async (req, res) => {
       donor,
       vendor,
       priority,
-      recordedBy: req.user.id
+      recordedBy: req.user.id,
     });
 
     // Send real-time notification
-    sendChurchNotification(churchId, 'financial-record-created', {
+    sendChurchNotification(churchId, "financial-record-created", {
       recordId: record._id,
       recordType: record.recordType,
       title: record.title,
       amount: record.amount,
-      createdBy: req.user.id
+      createdBy: req.user.id,
     });
 
     res.status(201).json({
       success: true,
       data: { record },
-      message: 'Financial record created successfully'
+      message: "Financial record created successfully",
     });
   } catch (error) {
-    console.error('Create financial record error:', error);
+    console.error("Create financial record error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to create financial record' }
+      error: { message: "Failed to create financial record" },
+    });
+  }
+};
+
+// @desc    Get financial records by church
+// @route   GET /api/financial-records/church/:churchId
+// @access  Private (Church Members)
+const getFinancialRecordsByChurch = async (req, res) => {
+  try {
+    const { churchId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const { type, category, status, priority, startDate, endDate, search } =
+      req.query;
+    const filter = { churchId };
+
+    if (type) filter.type = type;
+    if (category) filter.category = category;
+    if (status) filter.status = status;
+    if (priority) filter.priority = priority;
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) filter.date.$gte = new Date(startDate);
+      if (endDate) filter.date.$lte = new Date(endDate);
+    }
+
+    // Text search
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+        { subcategory: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const records = await ManualFinancialRecord.find(filter)
+      .populate("recordedBy", "firstName lastName email")
+      .populate("verifiedBy", "firstName lastName")
+      .populate("churchId", "name")
+      .skip(skip)
+      .limit(limit)
+      .sort({ date: -1 });
+
+    const total = await ManualFinancialRecord.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: {
+        records,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get financial records by church error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to get financial records" },
     });
   }
 };
@@ -69,7 +154,16 @@ const getAllFinancialRecords = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const { churchId, recordType, status, priority, source, startDate, endDate, search } = req.query;
+    const {
+      churchId,
+      recordType,
+      status,
+      priority,
+      source,
+      startDate,
+      endDate,
+      search,
+    } = req.query;
     const filter = {};
 
     if (churchId) filter.churchId = churchId;
@@ -88,19 +182,19 @@ const getAllFinancialRecords = async (req, res) => {
     // Text search
     if (search) {
       filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
-        { 'donor.name': { $regex: search, $options: 'i' } },
-        { 'vendor.name': { $regex: search, $options: 'i' } }
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+        { "donor.name": { $regex: search, $options: "i" } },
+        { "vendor.name": { $regex: search, $options: "i" } },
       ];
     }
 
     const records = await ManualFinancialRecord.find(filter)
-      .populate('churchId', 'name')
-      .populate('recordedBy', 'firstName lastName')
-      .populate('verifiedBy', 'firstName lastName')
-      .populate('reconciledBy', 'firstName lastName')
+      .populate("churchId", "name")
+      .populate("recordedBy", "firstName lastName")
+      .populate("verifiedBy", "firstName lastName")
+      .populate("reconciledBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ transactionDate: -1 });
@@ -115,15 +209,15 @@ const getAllFinancialRecords = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get all financial records error:', error);
+    console.error("Get all financial records error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get financial records' }
+      error: { message: "Failed to get financial records" },
     });
   }
 };
@@ -134,27 +228,27 @@ const getAllFinancialRecords = async (req, res) => {
 const getFinancialRecordById = async (req, res) => {
   try {
     const record = await ManualFinancialRecord.findById(req.params.id)
-      .populate('churchId', 'name')
-      .populate('recordedBy', 'firstName lastName email')
-      .populate('verifiedBy', 'firstName lastName email')
-      .populate('reconciledBy', 'firstName lastName email');
+      .populate("churchId", "name")
+      .populate("recordedBy", "firstName lastName email")
+      .populate("verifiedBy", "firstName lastName email")
+      .populate("reconciledBy", "firstName lastName email");
 
     if (!record) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Financial record not found' }
+        error: { message: "Financial record not found" },
       });
     }
 
     res.json({
       success: true,
-      data: { record }
+      data: { record },
     });
   } catch (error) {
-    console.error('Get financial record by ID error:', error);
+    console.error("Get financial record by ID error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get financial record' }
+      error: { message: "Failed to get financial record" },
     });
   }
 };
@@ -164,22 +258,34 @@ const getFinancialRecordById = async (req, res) => {
 // @access  Private (Church Members)
 const updateFinancialRecord = async (req, res) => {
   try {
-    const { title, description, amount, category, subcategory, transactionDate, source, sourceDetails, donor, vendor, priority } = req.body;
+    const {
+      title,
+      description,
+      amount,
+      category,
+      subcategory,
+      transactionDate,
+      source,
+      sourceDetails,
+      donor,
+      vendor,
+      priority,
+    } = req.body;
     const recordId = req.params.id;
 
     const record = await ManualFinancialRecord.findById(recordId);
     if (!record) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Financial record not found' }
+        error: { message: "Financial record not found" },
       });
     }
 
     // Only allow updates to pending records
-    if (record.status !== 'pending') {
+    if (record.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Cannot update verified or rejected records' }
+        error: { message: "Cannot update verified or rejected records" },
       });
     }
 
@@ -191,7 +297,8 @@ const updateFinancialRecord = async (req, res) => {
     if (subcategory) record.subcategory = subcategory;
     if (transactionDate) record.transactionDate = new Date(transactionDate);
     if (source) record.source = source;
-    if (sourceDetails) record.sourceDetails = { ...record.sourceDetails, ...sourceDetails };
+    if (sourceDetails)
+      record.sourceDetails = { ...record.sourceDetails, ...sourceDetails };
     if (donor) record.donor = { ...record.donor, ...donor };
     if (vendor) record.vendor = { ...record.vendor, ...vendor };
     if (priority) record.priority = priority;
@@ -204,13 +311,13 @@ const updateFinancialRecord = async (req, res) => {
     res.json({
       success: true,
       data: { record },
-      message: 'Financial record updated successfully'
+      message: "Financial record updated successfully",
     });
   } catch (error) {
-    console.error('Update financial record error:', error);
+    console.error("Update financial record error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update financial record' }
+      error: { message: "Failed to update financial record" },
     });
   }
 };
@@ -226,15 +333,15 @@ const deleteFinancialRecord = async (req, res) => {
     if (!record) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Financial record not found' }
+        error: { message: "Financial record not found" },
       });
     }
 
     // Only allow deletion of pending records
-    if (record.status !== 'pending') {
+    if (record.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Cannot delete verified or rejected records' }
+        error: { message: "Cannot delete verified or rejected records" },
       });
     }
 
@@ -242,13 +349,13 @@ const deleteFinancialRecord = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Financial record deleted successfully'
+      message: "Financial record deleted successfully",
     });
   } catch (error) {
-    console.error('Delete financial record error:', error);
+    console.error("Delete financial record error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to delete financial record' }
+      error: { message: "Failed to delete financial record" },
     });
   }
 };
@@ -265,14 +372,14 @@ const verifyFinancialRecord = async (req, res) => {
     if (!record) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Financial record not found' }
+        error: { message: "Financial record not found" },
       });
     }
 
-    if (record.status !== 'pending') {
+    if (record.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Record is not pending verification' }
+        error: { message: "Record is not pending verification" },
       });
     }
 
@@ -281,29 +388,29 @@ const verifyFinancialRecord = async (req, res) => {
       verifiedAt: new Date(),
       verificationMethod,
       verificationNotes,
-      confidence: confidence || 'medium'
+      confidence: confidence || "medium",
     };
 
-    record.status = 'verified';
+    record.status = "verified";
     await record.save();
 
     // Send real-time notification
-    sendChurchNotification(record.churchId, 'financial-record-verified', {
+    sendChurchNotification(record.churchId, "financial-record-verified", {
       recordId: record._id,
       title: record.title,
-      verifiedBy: req.user.id
+      verifiedBy: req.user.id,
     });
 
     res.json({
       success: true,
       data: { record },
-      message: 'Financial record verified successfully'
+      message: "Financial record verified successfully",
     });
   } catch (error) {
-    console.error('Verify financial record error:', error);
+    console.error("Verify financial record error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to verify financial record' }
+      error: { message: "Failed to verify financial record" },
     });
   }
 };
@@ -320,46 +427,46 @@ const rejectFinancialRecord = async (req, res) => {
     if (!record) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Financial record not found' }
+        error: { message: "Financial record not found" },
       });
     }
 
-    if (record.status !== 'pending') {
+    if (record.status !== "pending") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Record is not pending verification' }
+        error: { message: "Record is not pending verification" },
       });
     }
 
     record.verification = {
       verifiedBy: req.user.id,
       verifiedAt: new Date(),
-      verificationMethod: 'manual',
+      verificationMethod: "manual",
       verificationNotes: reason,
-      confidence: 'low'
+      confidence: "low",
     };
 
-    record.status = 'rejected';
+    record.status = "rejected";
     await record.save();
 
     // Send real-time notification
-    sendChurchNotification(record.churchId, 'financial-record-rejected', {
+    sendChurchNotification(record.churchId, "financial-record-rejected", {
       recordId: record._id,
       title: record.title,
       rejectedBy: req.user.id,
-      reason
+      reason,
     });
 
     res.json({
       success: true,
       data: { record },
-      message: 'Financial record rejected successfully'
+      message: "Financial record rejected successfully",
     });
   } catch (error) {
-    console.error('Reject financial record error:', error);
+    console.error("Reject financial record error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to reject financial record' }
+      error: { message: "Failed to reject financial record" },
     });
   }
 };
@@ -369,21 +476,22 @@ const rejectFinancialRecord = async (req, res) => {
 // @access  Private (Church Admin)
 const reconcileFinancialRecord = async (req, res) => {
   try {
-    const { reconciliationNotes, bankStatementMatch, bankStatementReference } = req.body;
+    const { reconciliationNotes, bankStatementMatch, bankStatementReference } =
+      req.body;
     const recordId = req.params.id;
 
     const record = await ManualFinancialRecord.findById(recordId);
     if (!record) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Financial record not found' }
+        error: { message: "Financial record not found" },
       });
     }
 
-    if (record.status !== 'verified') {
+    if (record.status !== "verified") {
       return res.status(400).json({
         success: false,
-        error: { message: 'Record must be verified before reconciliation' }
+        error: { message: "Record must be verified before reconciliation" },
       });
     }
 
@@ -393,28 +501,28 @@ const reconcileFinancialRecord = async (req, res) => {
       reconciledBy: req.user.id,
       reconciliationNotes,
       bankStatementMatch,
-      bankStatementReference
+      bankStatementReference,
     };
 
     await record.save();
 
     // Send real-time notification
-    sendChurchNotification(record.churchId, 'financial-record-reconciled', {
+    sendChurchNotification(record.churchId, "financial-record-reconciled", {
       recordId: record._id,
       title: record.title,
-      reconciledBy: req.user.id
+      reconciledBy: req.user.id,
     });
 
     res.json({
       success: true,
       data: { record },
-      message: 'Financial record reconciled successfully'
+      message: "Financial record reconciled successfully",
     });
   } catch (error) {
-    console.error('Reconcile financial record error:', error);
+    console.error("Reconcile financial record error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to reconcile financial record' }
+      error: { message: "Failed to reconcile financial record" },
     });
   }
 };
@@ -431,7 +539,7 @@ const addAttachment = async (req, res) => {
     if (!record) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Financial record not found' }
+        error: { message: "Financial record not found" },
       });
     }
 
@@ -442,7 +550,7 @@ const addAttachment = async (req, res) => {
       size,
       url,
       uploadedAt: new Date(),
-      uploadedBy: req.user.id
+      uploadedBy: req.user.id,
     };
 
     record.attachments.push(attachment);
@@ -451,13 +559,13 @@ const addAttachment = async (req, res) => {
     res.status(201).json({
       success: true,
       data: { attachment },
-      message: 'Attachment added successfully'
+      message: "Attachment added successfully",
     });
   } catch (error) {
-    console.error('Add attachment error:', error);
+    console.error("Add attachment error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to add attachment' }
+      error: { message: "Failed to add attachment" },
     });
   }
 };
@@ -473,7 +581,7 @@ const removeAttachment = async (req, res) => {
     if (!record) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Financial record not found' }
+        error: { message: "Financial record not found" },
       });
     }
 
@@ -481,7 +589,7 @@ const removeAttachment = async (req, res) => {
     if (!attachment) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Attachment not found' }
+        error: { message: "Attachment not found" },
       });
     }
 
@@ -490,13 +598,13 @@ const removeAttachment = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Attachment removed successfully'
+      message: "Attachment removed successfully",
     });
   } catch (error) {
-    console.error('Remove attachment error:', error);
+    console.error("Remove attachment error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to remove attachment' }
+      error: { message: "Failed to remove attachment" },
     });
   }
 };
@@ -513,15 +621,15 @@ const addNote = async (req, res) => {
     if (!record) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Financial record not found' }
+        error: { message: "Financial record not found" },
       });
     }
 
     const note = {
       content,
-      type: type || 'general',
+      type: type || "general",
       author: req.user.id,
-      date: new Date()
+      date: new Date(),
     };
 
     record.notes.push(note);
@@ -530,13 +638,13 @@ const addNote = async (req, res) => {
     res.status(201).json({
       success: true,
       data: { note },
-      message: 'Note added successfully'
+      message: "Note added successfully",
     });
   } catch (error) {
-    console.error('Add note error:', error);
+    console.error("Add note error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to add note' }
+      error: { message: "Failed to add note" },
     });
   }
 };
@@ -553,7 +661,7 @@ const updateTags = async (req, res) => {
     if (!record) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Financial record not found' }
+        error: { message: "Financial record not found" },
       });
     }
 
@@ -563,13 +671,13 @@ const updateTags = async (req, res) => {
     res.json({
       success: true,
       data: { tags: record.tags },
-      message: 'Tags updated successfully'
+      message: "Tags updated successfully",
     });
   } catch (error) {
-    console.error('Update tags error:', error);
+    console.error("Update tags error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update tags' }
+      error: { message: "Failed to update tags" },
     });
   }
 };
@@ -589,17 +697,21 @@ const getFinancialRecordStats = async (req, res) => {
       if (endDate) filter.transactionDate.$lte = new Date(endDate);
     }
 
-    const stats = await ManualFinancialRecord.getFinancialRecordStats(filter.churchId, filter.transactionDate?.$gte, filter.transactionDate?.$lte);
+    const stats = await ManualFinancialRecord.getFinancialRecordStats(
+      filter.churchId,
+      filter.transactionDate?.$gte,
+      filter.transactionDate?.$lte
+    );
 
     res.json({
       success: true,
-      data: { stats }
+      data: { stats },
     });
   } catch (error) {
-    console.error('Get financial record stats error:', error);
+    console.error("Get financial record stats error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get financial record statistics' }
+      error: { message: "Failed to get financial record statistics" },
     });
   }
 };
@@ -623,24 +735,24 @@ const getFinancialRecordsByType = async (req, res) => {
       { $match: filter },
       {
         $group: {
-          _id: '$recordType',
-          totalAmount: { $sum: '$amount' },
+          _id: "$recordType",
+          totalAmount: { $sum: "$amount" },
           count: { $sum: 1 },
-          averageAmount: { $avg: '$amount' }
-        }
+          averageAmount: { $avg: "$amount" },
+        },
       },
-      { $sort: { totalAmount: -1 } }
+      { $sort: { totalAmount: -1 } },
     ]);
 
     res.json({
       success: true,
-      data: { stats }
+      data: { stats },
     });
   } catch (error) {
-    console.error('Get financial records by type error:', error);
+    console.error("Get financial records by type error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get type statistics' }
+      error: { message: "Failed to get type statistics" },
     });
   }
 };
@@ -650,7 +762,7 @@ const getFinancialRecordsByType = async (req, res) => {
 // @access  Private (Church Members)
 const getFinancialRecordsByDate = async (req, res) => {
   try {
-    const { churchId, startDate, endDate, groupBy = 'day' } = req.query;
+    const { churchId, startDate, endDate, groupBy = "day" } = req.query;
 
     const filter = {};
     if (churchId) filter.churchId = churchId;
@@ -661,12 +773,18 @@ const getFinancialRecordsByDate = async (req, res) => {
     }
 
     let dateFormat;
-    if (groupBy === 'month') {
-      dateFormat = { $dateToString: { format: '%Y-%m', date: '$transactionDate' } };
-    } else if (groupBy === 'week') {
-      dateFormat = { $dateToString: { format: '%Y-%U', date: '$transactionDate' } };
+    if (groupBy === "month") {
+      dateFormat = {
+        $dateToString: { format: "%Y-%m", date: "$transactionDate" },
+      };
+    } else if (groupBy === "week") {
+      dateFormat = {
+        $dateToString: { format: "%Y-%U", date: "$transactionDate" },
+      };
     } else {
-      dateFormat = { $dateToString: { format: '%Y-%m-%d', date: '$transactionDate' } };
+      dateFormat = {
+        $dateToString: { format: "%Y-%m-%d", date: "$transactionDate" },
+      };
     }
 
     const stats = await ManualFinancialRecord.aggregate([
@@ -674,22 +792,22 @@ const getFinancialRecordsByDate = async (req, res) => {
       {
         $group: {
           _id: dateFormat,
-          totalAmount: { $sum: '$amount' },
-          count: { $sum: 1 }
-        }
+          totalAmount: { $sum: "$amount" },
+          count: { $sum: 1 },
+        },
       },
-      { $sort: { _id: 1 } }
+      { $sort: { _id: 1 } },
     ]);
 
     res.json({
       success: true,
-      data: { stats }
+      data: { stats },
     });
   } catch (error) {
-    console.error('Get financial records by date error:', error);
+    console.error("Get financial records by date error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get date statistics' }
+      error: { message: "Failed to get date statistics" },
     });
   }
 };
@@ -704,12 +822,12 @@ const getPendingFinancialRecords = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const filter = { status: 'pending' };
+    const filter = { status: "pending" };
     if (churchId) filter.churchId = churchId;
 
     const records = await ManualFinancialRecord.find(filter)
-      .populate('churchId', 'name')
-      .populate('recordedBy', 'firstName lastName')
+      .populate("churchId", "name")
+      .populate("recordedBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ transactionDate: -1 });
@@ -724,15 +842,15 @@ const getPendingFinancialRecords = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get pending financial records error:', error);
+    console.error("Get pending financial records error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get pending financial records' }
+      error: { message: "Failed to get pending financial records" },
     });
   }
 };
@@ -747,12 +865,12 @@ const getUnverifiedFinancialRecords = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const filter = { status: 'pending' };
+    const filter = { status: "pending" };
     if (churchId) filter.churchId = churchId;
 
     const records = await ManualFinancialRecord.find(filter)
-      .populate('churchId', 'name')
-      .populate('recordedBy', 'firstName lastName')
+      .populate("churchId", "name")
+      .populate("recordedBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ transactionDate: -1 });
@@ -767,15 +885,15 @@ const getUnverifiedFinancialRecords = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get unverified financial records error:', error);
+    console.error("Get unverified financial records error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get unverified financial records' }
+      error: { message: "Failed to get unverified financial records" },
     });
   }
 };
@@ -790,13 +908,13 @@ const getUnreconciledFinancialRecords = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const filter = { status: 'verified', 'reconciliation.isReconciled': false };
+    const filter = { status: "verified", "reconciliation.isReconciled": false };
     if (churchId) filter.churchId = churchId;
 
     const records = await ManualFinancialRecord.find(filter)
-      .populate('churchId', 'name')
-      .populate('recordedBy', 'firstName lastName')
-      .populate('verifiedBy', 'firstName lastName')
+      .populate("churchId", "name")
+      .populate("recordedBy", "firstName lastName")
+      .populate("verifiedBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ transactionDate: -1 });
@@ -811,15 +929,382 @@ const getUnreconciledFinancialRecords = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get unreconciled financial records error:', error);
+    console.error("Get unreconciled financial records error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get unreconciled financial records' }
+      error: { message: "Failed to get unreconciled financial records" },
+    });
+  }
+};
+
+// @desc    Update financial record note
+// @route   PUT /api/financial-records/:id/notes/:noteId
+// @access  Private (Church Members)
+const updateNote = async (req, res) => {
+  try {
+    const { id, noteId } = req.params;
+    const { content, type } = req.body;
+
+    const record = await ManualFinancialRecord.findById(id);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Financial record not found" },
+      });
+    }
+
+    const noteIndex = record.notes.findIndex(
+      (n) => n._id.toString() === noteId
+    );
+    if (noteIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Note not found" },
+      });
+    }
+
+    if (content) record.notes[noteIndex].content = content;
+    if (type) record.notes[noteIndex].type = type;
+
+    await record.save();
+
+    res.json({
+      success: true,
+      data: { note: record.notes[noteIndex] },
+      message: "Note updated successfully",
+    });
+  } catch (error) {
+    console.error("Update note error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to update note" },
+    });
+  }
+};
+
+// @desc    Delete financial record note
+// @route   DELETE /api/financial-records/:id/notes/:noteId
+// @access  Private (Church Members)
+const deleteNote = async (req, res) => {
+  try {
+    const { id, noteId } = req.params;
+
+    const record = await ManualFinancialRecord.findById(id);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Financial record not found" },
+      });
+    }
+
+    const noteIndex = record.notes.findIndex(
+      (n) => n._id.toString() === noteId
+    );
+    if (noteIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Note not found" },
+      });
+    }
+
+    record.notes.splice(noteIndex, 1);
+    await record.save();
+
+    res.json({
+      success: true,
+      message: "Note deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete note error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to delete note" },
+    });
+  }
+};
+
+// @desc    Add tags to financial record
+// @route   POST /api/financial-records/:id/tags
+// @access  Private (Church Admin)
+const addTags = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.body;
+
+    const record = await ManualFinancialRecord.findById(id);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Financial record not found" },
+      });
+    }
+
+    // Add new tags without duplicates
+    tags.forEach((tag) => {
+      if (!record.tags.includes(tag)) {
+        record.tags.push(tag);
+      }
+    });
+
+    await record.save();
+
+    res.status(201).json({
+      success: true,
+      data: { tags: record.tags },
+      message: "Tags added successfully",
+    });
+  } catch (error) {
+    console.error("Add tags error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to add tags" },
+    });
+  }
+};
+
+// @desc    Remove tags from financial record
+// @route   DELETE /api/financial-records/:id/tags
+// @access  Private (Church Admin)
+const removeTags = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.body;
+
+    const record = await ManualFinancialRecord.findById(id);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        error: { message: "Financial record not found" },
+      });
+    }
+
+    // Remove specified tags
+    record.tags = record.tags.filter((tag) => !tags.includes(tag));
+    await record.save();
+
+    res.json({
+      success: true,
+      data: { tags: record.tags },
+      message: "Tags removed successfully",
+    });
+  } catch (error) {
+    console.error("Remove tags error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to remove tags" },
+    });
+  }
+};
+
+// @desc    Get total financial records for a church
+// @route   GET /api/financial-records/totals/church/:churchId
+// @access  Private (Church Members)
+const getTotalFinancialRecords = async (req, res) => {
+  try {
+    const { churchId } = req.params;
+    const { startDate, endDate, type } = req.query;
+
+    const filter = { churchId };
+
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) filter.date.$gte = new Date(startDate);
+      if (endDate) filter.date.$lte = new Date(endDate);
+    }
+
+    if (type) filter.type = type;
+
+    const totalAmount = await ManualFinancialRecord.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+
+    const totalCount = await ManualFinancialRecord.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: {
+        totalAmount: totalAmount[0]?.total || 0,
+        totalCount,
+        currency: "NGN",
+      },
+    });
+  } catch (error) {
+    console.error("Get total financial records error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to get total financial records" },
+    });
+  }
+};
+
+// @desc    Get overdue verification records
+// @route   GET /api/financial-records/overdue-verification
+// @access  Private (Church Members)
+const getOverdueVerificationRecords = async (req, res) => {
+  try {
+    const { churchId, days = 7 } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - parseInt(days));
+
+    const filter = {
+      status: "pending",
+      createdAt: { $lt: cutoffDate },
+    };
+    if (churchId) filter.churchId = churchId;
+
+    const records = await ManualFinancialRecord.find(filter)
+      .populate("churchId", "name")
+      .populate("recordedBy", "firstName lastName")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: 1 });
+
+    const total = await ManualFinancialRecord.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: {
+        records,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get overdue verification records error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to get overdue verification records" },
+    });
+  }
+};
+
+// @desc    Bulk import financial records
+// @route   POST /api/financial-records/bulk-import
+// @access  Private (Church Admin)
+const bulkImportFinancialRecords = async (req, res) => {
+  try {
+    const { churchId, records } = req.body;
+
+    if (!records || !Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: "Records array is required" },
+      });
+    }
+
+    const results = {
+      success: [],
+      errors: [],
+    };
+
+    for (const recordData of records) {
+      try {
+        const record = await ManualFinancialRecord.create({
+          churchId,
+          ...recordData,
+          status: "pending",
+        });
+        results.success.push(record);
+      } catch (error) {
+        results.errors.push({
+          data: recordData,
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: { results },
+      message: `Successfully imported ${results.success.length} records`,
+    });
+  } catch (error) {
+    console.error("Bulk import financial records error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to bulk import financial records" },
+    });
+  }
+};
+
+// @desc    Export financial records
+// @route   GET /api/financial-records/export
+// @access  Private (Church Admin)
+const exportFinancialRecords = async (req, res) => {
+  try {
+    const { churchId, format = "csv" } = req.query;
+
+    // In a real implementation, you would export financial records to the specified format
+    // For now, we'll return a mock response
+    console.log("Exporting financial records:", { churchId, format });
+
+    res.json({
+      success: true,
+      message: "Financial records exported successfully",
+      data: { downloadUrl: "/exports/financial-records.csv" },
+    });
+  } catch (error) {
+    console.error("Export financial records error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to export financial records" },
+    });
+  }
+};
+
+// @desc    Get reconciliation report
+// @route   GET /api/financial-records/reconciliation-report
+// @access  Private (Church Admin)
+const getReconciliationReport = async (req, res) => {
+  try {
+    const { churchId, startDate, endDate } = req.query;
+
+    const filter = { churchId };
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) filter.date.$gte = new Date(startDate);
+      if (endDate) filter.date.$lte = new Date(endDate);
+    }
+
+    const records = await ManualFinancialRecord.find(filter)
+      .populate("recordedBy", "firstName lastName")
+      .populate("verifiedBy", "firstName lastName")
+      .sort({ date: -1 });
+
+    const report = {
+      totalRecords: records.length,
+      verifiedRecords: records.filter((r) => r.status === "verified").length,
+      pendingRecords: records.filter((r) => r.status === "pending").length,
+      rejectedRecords: records.filter((r) => r.status === "rejected").length,
+      reconciledRecords: records.filter((r) => r.reconciliation?.isReconciled)
+        .length,
+      totalAmount: records.reduce((sum, r) => sum + r.amount, 0),
+      records,
+    };
+
+    res.json({
+      success: true,
+      data: { report },
+    });
+  } catch (error) {
+    console.error("Get reconciliation report error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to get reconciliation report" },
     });
   }
 };
@@ -837,15 +1322,15 @@ const getOverdueVerificationFinancialRecords = async (req, res) => {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - parseInt(days));
 
-    const filter = { 
-      status: 'pending', 
-      createdAt: { $lt: cutoffDate }
+    const filter = {
+      status: "pending",
+      createdAt: { $lt: cutoffDate },
     };
     if (churchId) filter.churchId = churchId;
 
     const records = await ManualFinancialRecord.find(filter)
-      .populate('churchId', 'name')
-      .populate('recordedBy', 'firstName lastName')
+      .populate("churchId", "name")
+      .populate("recordedBy", "firstName lastName")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: 1 });
@@ -860,15 +1345,17 @@ const getOverdueVerificationFinancialRecords = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get overdue verification financial records error:', error);
+    console.error("Get overdue verification financial records error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get overdue verification financial records' }
+      error: {
+        message: "Failed to get overdue verification financial records",
+      },
     });
   }
 };
@@ -876,6 +1363,7 @@ const getOverdueVerificationFinancialRecords = async (req, res) => {
 module.exports = {
   createFinancialRecord,
   getAllFinancialRecords,
+  getFinancialRecordsByChurch,
   getFinancialRecordById,
   updateFinancialRecord,
   deleteFinancialRecord,
@@ -885,12 +1373,21 @@ module.exports = {
   addAttachment,
   removeAttachment,
   addNote,
+  updateNote,
+  deleteNote,
+  addTags,
+  removeTags,
   updateTags,
   getFinancialRecordStats,
+  getTotalFinancialRecords,
   getFinancialRecordsByType,
   getFinancialRecordsByDate,
   getPendingFinancialRecords,
   getUnverifiedFinancialRecords,
   getUnreconciledFinancialRecords,
-  getOverdueVerificationFinancialRecords
+  getOverdueVerificationFinancialRecords,
+  getOverdueVerificationRecords,
+  bulkImportFinancialRecords,
+  exportFinancialRecords,
+  getReconciliationReport,
 };

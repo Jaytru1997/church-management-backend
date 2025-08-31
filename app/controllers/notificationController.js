@@ -1,46 +1,56 @@
-const { sendNotification, sendChurchNotification, sendUserNotification, sendTeamNotification } = require('../../config/pusher');
-const emailService = require('../../config/email');
+const {
+  sendNotification,
+  sendChurchNotification,
+  sendUserNotification,
+  sendTeamNotification,
+} = require("../../config/pusher");
+const emailService = require("../../config/email");
 
 // @desc    Send a notification
 // @route   POST /api/notifications/send
 // @access  Private (Church Admin)
 const sendNotificationHandler = async (req, res) => {
   try {
-    const { churchId, type, title, message, priority, recipients, data } = req.body;
+    const { churchId, type, title, message, priority, recipients, data } =
+      req.body;
 
     // Send real-time notification
     const notificationData = {
       type,
       title,
       message,
-      priority: priority || 'normal',
+      priority: priority || "normal",
       data,
       sentAt: new Date(),
-      sentBy: req.user.id
+      sentBy: req.user.id,
     };
 
     // Send to specific recipients if provided
     if (recipients && recipients.length > 0) {
-      recipients.forEach(recipientId => {
-        sendUserNotification(recipientId, 'notification-received', notificationData);
+      recipients.forEach((recipientId) => {
+        sendUserNotification(
+          recipientId,
+          "notification-received",
+          notificationData
+        );
       });
     }
 
     // Send to church channel if churchId provided
     if (churchId) {
-      sendChurchNotification(churchId, 'notification-sent', notificationData);
+      sendChurchNotification(churchId, "notification-sent", notificationData);
     }
 
     res.json({
       success: true,
       data: { notification: notificationData },
-      message: 'Notification sent successfully'
+      message: "Notification sent successfully",
     });
   } catch (error) {
-    console.error('Send notification error:', error);
+    console.error("Send notification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to send notification' }
+      error: { message: "Failed to send notification" },
     });
   }
 };
@@ -50,44 +60,52 @@ const sendNotificationHandler = async (req, res) => {
 // @access  Private (Church Admin)
 const sendChurchNotificationHandler = async (req, res) => {
   try {
-    const { type, title, message, priority, data, includeMembers, includeVolunteers } = req.body;
+    const {
+      type,
+      title,
+      message,
+      priority,
+      data,
+      includeMembers,
+      includeVolunteers,
+    } = req.body;
     const churchId = req.churchAccess.churchId;
 
     const notificationData = {
       type,
       title,
       message,
-      priority: priority || 'normal',
+      priority: priority || "normal",
       data,
       sentAt: new Date(),
       sentBy: req.user.id,
-      churchId
+      churchId,
     };
 
     // Send to church channel
-    sendChurchNotification(churchId, 'church-notification', notificationData);
+    sendChurchNotification(churchId, "church-notification", notificationData);
 
     // Send email notifications if configured
     if (data?.sendEmail) {
       try {
         // This would typically involve getting church member emails and sending bulk emails
         // For now, we'll just log the intent
-        console.log('Email notification requested for church:', churchId);
+        console.log("Email notification requested for church:", churchId);
       } catch (emailError) {
-        console.error('Email notification error:', emailError);
+        console.error("Email notification error:", emailError);
       }
     }
 
     res.json({
       success: true,
       data: { notification: notificationData },
-      message: 'Church notification sent successfully'
+      message: "Church notification sent successfully",
     });
   } catch (error) {
-    console.error('Send church notification error:', error);
+    console.error("Send church notification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to send church notification' }
+      error: { message: "Failed to send church notification" },
     });
   }
 };
@@ -103,35 +121,35 @@ const sendUserNotificationHandler = async (req, res) => {
       type,
       title,
       message,
-      priority: priority || 'normal',
+      priority: priority || "normal",
       data,
       sentAt: new Date(),
-      sentBy: req.user.id
+      sentBy: req.user.id,
     };
 
     // Send real-time notification
-    sendUserNotification(userId, 'notification-received', notificationData);
+    sendUserNotification(userId, "notification-received", notificationData);
 
     // Send email notification if configured
     if (data?.sendEmail) {
       try {
         // This would typically involve getting user email and sending email
-        console.log('Email notification requested for user:', userId);
+        console.log("Email notification requested for user:", userId);
       } catch (emailError) {
-        console.error('Email notification error:', emailError);
+        console.error("Email notification error:", emailError);
       }
     }
 
     res.json({
       success: true,
       data: { notification: notificationData },
-      message: 'User notification sent successfully'
+      message: "User notification sent successfully",
     });
   } catch (error) {
-    console.error('Send user notification error:', error);
+    console.error("Send user notification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to send user notification' }
+      error: { message: "Failed to send user notification" },
     });
   }
 };
@@ -147,26 +165,26 @@ const sendTeamNotificationHandler = async (req, res) => {
       type,
       title,
       message,
-      priority: priority || 'normal',
+      priority: priority || "normal",
       data,
       sentAt: new Date(),
       sentBy: req.user.id,
-      teamId
+      teamId,
     };
 
     // Send to team channel
-    sendTeamNotification(teamId, 'team-notification', notificationData);
+    sendTeamNotification(teamId, "team-notification", notificationData);
 
     res.json({
       success: true,
       data: { notification: notificationData },
-      message: 'Team notification sent successfully'
+      message: "Team notification sent successfully",
     });
   } catch (error) {
-    console.error('Send team notification error:', error);
+    console.error("Send team notification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to send team notification' }
+      error: { message: "Failed to send team notification" },
     });
   }
 };
@@ -185,8 +203,8 @@ const getAllNotifications = async (req, res) => {
 
     if (type) filter.type = type;
     if (priority) filter.priority = priority;
-    if (isRead !== undefined) filter.isRead = isRead === 'true';
-    if (isArchived !== undefined) filter.isArchived = isArchived === 'true';
+    if (isRead !== undefined) filter.isRead = isRead === "true";
+    if (isArchived !== undefined) filter.isArchived = isArchived === "true";
 
     // In a real implementation, you would have a Notification model
     // For now, we'll return a mock response
@@ -201,15 +219,15 @@ const getAllNotifications = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get all notifications error:', error);
+    console.error("Get all notifications error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get notifications' }
+      error: { message: "Failed to get notifications" },
     });
   }
 };
@@ -248,15 +266,15 @@ const getNotificationsByChurch = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get notifications by church error:', error);
+    console.error("Get notifications by church error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get church notifications' }
+      error: { message: "Failed to get church notifications" },
     });
   }
 };
@@ -275,19 +293,19 @@ const getNotificationById = async (req, res) => {
     if (!notification) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Notification not found' }
+        error: { message: "Notification not found" },
       });
     }
 
     res.json({
       success: true,
-      data: { notification }
+      data: { notification },
     });
   } catch (error) {
-    console.error('Get notification by ID error:', error);
+    console.error("Get notification by ID error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get notification' }
+      error: { message: "Failed to get notification" },
     });
   }
 };
@@ -301,17 +319,17 @@ const markNotificationAsRead = async (req, res) => {
 
     // In a real implementation, you would update the Notification model
     // For now, we'll return a mock response
-    console.log('Marking notification as read:', id);
+    console.log("Marking notification as read:", id);
 
     res.json({
       success: true,
-      message: 'Notification marked as read'
+      message: "Notification marked as read",
     });
   } catch (error) {
-    console.error('Mark notification as read error:', error);
+    console.error("Mark notification as read error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to mark notification as read' }
+      error: { message: "Failed to mark notification as read" },
     });
   }
 };
@@ -325,17 +343,17 @@ const markNotificationAsUnread = async (req, res) => {
 
     // In a real implementation, you would update the Notification model
     // For now, we'll return a mock response
-    console.log('Marking notification as unread:', id);
+    console.log("Marking notification as unread:", id);
 
     res.json({
       success: true,
-      message: 'Notification marked as unread'
+      message: "Notification marked as unread",
     });
   } catch (error) {
-    console.error('Mark notification as unread error:', error);
+    console.error("Mark notification as unread error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to mark notification as unread' }
+      error: { message: "Failed to mark notification as unread" },
     });
   }
 };
@@ -349,17 +367,17 @@ const archiveNotification = async (req, res) => {
 
     // In a real implementation, you would update the Notification model
     // For now, we'll return a mock response
-    console.log('Archiving notification:', id);
+    console.log("Archiving notification:", id);
 
     res.json({
       success: true,
-      message: 'Notification archived successfully'
+      message: "Notification archived successfully",
     });
   } catch (error) {
-    console.error('Archive notification error:', error);
+    console.error("Archive notification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to archive notification' }
+      error: { message: "Failed to archive notification" },
     });
   }
 };
@@ -373,17 +391,17 @@ const unarchiveNotification = async (req, res) => {
 
     // In a real implementation, you would update the Notification model
     // For now, we'll return a mock response
-    console.log('Unarchiving notification:', id);
+    console.log("Unarchiving notification:", id);
 
     res.json({
       success: true,
-      message: 'Notification unarchived successfully'
+      message: "Notification unarchived successfully",
     });
   } catch (error) {
-    console.error('Unarchive notification error:', error);
+    console.error("Unarchive notification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to unarchive notification' }
+      error: { message: "Failed to unarchive notification" },
     });
   }
 };
@@ -397,17 +415,17 @@ const deleteNotification = async (req, res) => {
 
     // In a real implementation, you would delete from the Notification model
     // For now, we'll return a mock response
-    console.log('Deleting notification:', id);
+    console.log("Deleting notification:", id);
 
     res.json({
       success: true,
-      message: 'Notification deleted successfully'
+      message: "Notification deleted successfully",
     });
   } catch (error) {
-    console.error('Delete notification error:', error);
+    console.error("Delete notification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to delete notification' }
+      error: { message: "Failed to delete notification" },
     });
   }
 };
@@ -422,23 +440,23 @@ const bulkMarkAsRead = async (req, res) => {
     if (!notificationIds || !Array.isArray(notificationIds)) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Notification IDs array is required' }
+        error: { message: "Notification IDs array is required" },
       });
     }
 
     // In a real implementation, you would update multiple notifications
     // For now, we'll return a mock response
-    console.log('Bulk marking notifications as read:', notificationIds);
+    console.log("Bulk marking notifications as read:", notificationIds);
 
     res.json({
       success: true,
-      message: `${notificationIds.length} notifications marked as read`
+      message: `${notificationIds.length} notifications marked as read`,
     });
   } catch (error) {
-    console.error('Bulk mark as read error:', error);
+    console.error("Bulk mark as read error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to bulk mark notifications as read' }
+      error: { message: "Failed to bulk mark notifications as read" },
     });
   }
 };
@@ -453,23 +471,23 @@ const bulkArchive = async (req, res) => {
     if (!notificationIds || !Array.isArray(notificationIds)) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Notification IDs array is required' }
+        error: { message: "Notification IDs array is required" },
       });
     }
 
     // In a real implementation, you would update multiple notifications
     // For now, we'll return a mock response
-    console.log('Bulk archiving notifications:', notificationIds);
+    console.log("Bulk archiving notifications:", notificationIds);
 
     res.json({
       success: true,
-      message: `${notificationIds.length} notifications archived successfully`
+      message: `${notificationIds.length} notifications archived successfully`,
     });
   } catch (error) {
-    console.error('Bulk archive error:', error);
+    console.error("Bulk archive error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to bulk archive notifications' }
+      error: { message: "Failed to bulk archive notifications" },
     });
   }
 };
@@ -484,23 +502,23 @@ const bulkDelete = async (req, res) => {
     if (!notificationIds || !Array.isArray(notificationIds)) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Notification IDs array is required' }
+        error: { message: "Notification IDs array is required" },
       });
     }
 
     // In a real implementation, you would delete multiple notifications
     // For now, we'll return a mock response
-    console.log('Bulk deleting notifications:', notificationIds);
+    console.log("Bulk deleting notifications:", notificationIds);
 
     res.json({
       success: true,
-      message: `${notificationIds.length} notifications deleted successfully`
+      message: `${notificationIds.length} notifications deleted successfully`,
     });
   } catch (error) {
-    console.error('Bulk delete error:', error);
+    console.error("Bulk delete error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to bulk delete notifications' }
+      error: { message: "Failed to bulk delete notifications" },
     });
   }
 };
@@ -516,13 +534,13 @@ const getUnreadCount = async (req, res) => {
 
     res.json({
       success: true,
-      data: { count }
+      data: { count },
     });
   } catch (error) {
-    console.error('Get unread count error:', error);
+    console.error("Get unread count error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get unread count' }
+      error: { message: "Failed to get unread count" },
     });
   }
 };
@@ -549,15 +567,15 @@ const getUnreadNotifications = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get unread notifications error:', error);
+    console.error("Get unread notifications error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get unread notifications' }
+      error: { message: "Failed to get unread notifications" },
     });
   }
 };
@@ -584,15 +602,15 @@ const getArchivedNotifications = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get archived notifications error:', error);
+    console.error("Get archived notifications error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get archived notifications' }
+      error: { message: "Failed to get archived notifications" },
     });
   }
 };
@@ -620,15 +638,15 @@ const getNotificationsByType = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get notifications by type error:', error);
+    console.error("Get notifications by type error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get notifications by type' }
+      error: { message: "Failed to get notifications by type" },
     });
   }
 };
@@ -656,15 +674,15 @@ const getNotificationsByPriority = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get notifications by priority error:', error);
+    console.error("Get notifications by priority error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get notifications by priority' }
+      error: { message: "Failed to get notifications by priority" },
     });
   }
 };
@@ -682,13 +700,13 @@ const getRecentNotifications = async (req, res) => {
 
     res.json({
       success: true,
-      data: { notifications }
+      data: { notifications },
     });
   } catch (error) {
-    console.error('Get recent notifications error:', error);
+    console.error("Get recent notifications error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get recent notifications' }
+      error: { message: "Failed to get recent notifications" },
     });
   }
 };
@@ -698,32 +716,41 @@ const getRecentNotifications = async (req, res) => {
 // @access  Private (Church Admin)
 const scheduleNotification = async (req, res) => {
   try {
-    const { churchId, type, title, message, priority, recipients, scheduledAt, data } = req.body;
+    const {
+      churchId,
+      type,
+      title,
+      message,
+      priority,
+      recipients,
+      scheduledAt,
+      data,
+    } = req.body;
 
     // In a real implementation, you would create a scheduled notification
     // For now, we'll return a mock response
     const scheduledNotification = {
-      id: 'scheduled_' + Date.now(),
+      id: "scheduled_" + Date.now(),
       type,
       title,
       message,
-      priority: priority || 'normal',
+      priority: priority || "normal",
       recipients,
       scheduledAt: new Date(scheduledAt),
       data,
-      createdBy: req.user.id
+      createdBy: req.user.id,
     };
 
     res.status(201).json({
       success: true,
       data: { scheduledNotification },
-      message: 'Notification scheduled successfully'
+      message: "Notification scheduled successfully",
     });
   } catch (error) {
-    console.error('Schedule notification error:', error);
+    console.error("Schedule notification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to schedule notification' }
+      error: { message: "Failed to schedule notification" },
     });
   }
 };
@@ -738,17 +765,17 @@ const updateScheduledNotification = async (req, res) => {
 
     // In a real implementation, you would update the scheduled notification
     // For now, we'll return a mock response
-    console.log('Updating scheduled notification:', id);
+    console.log("Updating scheduled notification:", id);
 
     res.json({
       success: true,
-      message: 'Scheduled notification updated successfully'
+      message: "Scheduled notification updated successfully",
     });
   } catch (error) {
-    console.error('Update scheduled notification error:', error);
+    console.error("Update scheduled notification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update scheduled notification' }
+      error: { message: "Failed to update scheduled notification" },
     });
   }
 };
@@ -762,17 +789,17 @@ const cancelScheduledNotification = async (req, res) => {
 
     // In a real implementation, you would cancel the scheduled notification
     // For now, we'll return a mock response
-    console.log('Canceling scheduled notification:', id);
+    console.log("Canceling scheduled notification:", id);
 
     res.json({
       success: true,
-      message: 'Scheduled notification canceled successfully'
+      message: "Scheduled notification canceled successfully",
     });
   } catch (error) {
-    console.error('Cancel scheduled notification error:', error);
+    console.error("Cancel scheduled notification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to cancel scheduled notification' }
+      error: { message: "Failed to cancel scheduled notification" },
     });
   }
 };
@@ -800,15 +827,15 @@ const getScheduledNotifications = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get scheduled notifications error:', error);
+    console.error("Get scheduled notifications error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get scheduled notifications' }
+      error: { message: "Failed to get scheduled notifications" },
     });
   }
 };
@@ -818,34 +845,69 @@ const getScheduledNotifications = async (req, res) => {
 // @access  Private (Church Admin)
 const createNotificationTemplate = async (req, res) => {
   try {
-    const { churchId, name, type, title, message, priority, data, isActive } = req.body;
+    const { churchId, name, type, title, message, priority, data, isActive } =
+      req.body;
 
     // In a real implementation, you would create a notification template
     // For now, we'll return a mock response
     const template = {
-      id: 'template_' + Date.now(),
+      id: "template_" + Date.now(),
       churchId,
       name,
       type,
       title,
       message,
-      priority: priority || 'normal',
+      priority: priority || "normal",
       data,
       isActive: isActive !== false,
       createdBy: req.user.id,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
 
     res.status(201).json({
       success: true,
       data: { template },
-      message: 'Notification template created successfully'
+      message: "Notification template created successfully",
     });
   } catch (error) {
-    console.error('Create notification template error:', error);
+    console.error("Create notification template error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to create notification template' }
+      error: { message: "Failed to create notification template" },
+    });
+  }
+};
+
+// @desc    Get notification template by ID
+// @route   GET /api/notifications/templates/:id
+// @access  Private (Church Admin)
+const getNotificationTemplateById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // In a real implementation, you would fetch the template from database
+    // For now, we'll return a mock response
+    const template = {
+      _id: id,
+      name: "Sample Template",
+      title: "Sample Title",
+      message: "Sample message with variables: {{name}}, {{amount}}",
+      type: "general",
+      variables: ["name", "amount"],
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    res.json({
+      success: true,
+      data: { template },
+    });
+  } catch (error) {
+    console.error("Get notification template by ID error:", error);
+    res.status(500).json({
+      success: false,
+      error: { message: "Failed to get notification template" },
     });
   }
 };
@@ -863,13 +925,13 @@ const getNotificationTemplates = async (req, res) => {
 
     res.json({
       success: true,
-      data: { templates }
+      data: { templates },
     });
   } catch (error) {
-    console.error('Get notification templates error:', error);
+    console.error("Get notification templates error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get notification templates' }
+      error: { message: "Failed to get notification templates" },
     });
   }
 };
@@ -884,17 +946,17 @@ const updateNotificationTemplate = async (req, res) => {
 
     // In a real implementation, you would update the notification template
     // For now, we'll return a mock response
-    console.log('Updating notification template:', id);
+    console.log("Updating notification template:", id);
 
     res.json({
       success: true,
-      message: 'Notification template updated successfully'
+      message: "Notification template updated successfully",
     });
   } catch (error) {
-    console.error('Update notification template error:', error);
+    console.error("Update notification template error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update notification template' }
+      error: { message: "Failed to update notification template" },
     });
   }
 };
@@ -908,17 +970,17 @@ const deleteNotificationTemplate = async (req, res) => {
 
     // In a real implementation, you would delete the notification template
     // For now, we'll return a mock response
-    console.log('Deleting notification template:', id);
+    console.log("Deleting notification template:", id);
 
     res.json({
       success: true,
-      message: 'Notification template deleted successfully'
+      message: "Notification template deleted successfully",
     });
   } catch (error) {
-    console.error('Delete notification template error:', error);
+    console.error("Delete notification template error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to delete notification template' }
+      error: { message: "Failed to delete notification template" },
     });
   }
 };
@@ -933,17 +995,17 @@ const sendNotificationUsingTemplate = async (req, res) => {
 
     // In a real implementation, you would send notification using the template
     // For now, we'll return a mock response
-    console.log('Sending notification using template:', id);
+    console.log("Sending notification using template:", id);
 
     res.json({
       success: true,
-      message: 'Notification sent using template successfully'
+      message: "Notification sent using template successfully",
     });
   } catch (error) {
-    console.error('Send notification using template error:', error);
+    console.error("Send notification using template error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to send notification using template' }
+      error: { message: "Failed to send notification using template" },
     });
   }
 };
@@ -963,18 +1025,18 @@ const getNotificationStats = async (req, res) => {
       totalUnread: 0,
       totalArchived: 0,
       byType: {},
-      byPriority: {}
+      byPriority: {},
     };
 
     res.json({
       success: true,
-      data: { stats }
+      data: { stats },
     });
   } catch (error) {
-    console.error('Get notification stats error:', error);
+    console.error("Get notification stats error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get notification statistics' }
+      error: { message: "Failed to get notification statistics" },
     });
   }
 };
@@ -984,22 +1046,27 @@ const getNotificationStats = async (req, res) => {
 // @access  Private (Church Admin)
 const exportNotifications = async (req, res) => {
   try {
-    const { churchId, format = 'csv', startDate, endDate } = req.query;
+    const { churchId, format = "csv", startDate, endDate } = req.query;
 
     // In a real implementation, you would export notifications
     // For now, we'll return a mock response
-    console.log('Exporting notifications:', { churchId, format, startDate, endDate });
+    console.log("Exporting notifications:", {
+      churchId,
+      format,
+      startDate,
+      endDate,
+    });
 
     res.json({
       success: true,
-      message: 'Notifications exported successfully',
-      data: { downloadUrl: '/exports/notifications.csv' }
+      message: "Notifications exported successfully",
+      data: { downloadUrl: "/exports/notifications.csv" },
     });
   } catch (error) {
-    console.error('Export notifications error:', error);
+    console.error("Export notifications error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to export notifications' }
+      error: { message: "Failed to export notifications" },
     });
   }
 };
@@ -1032,9 +1099,10 @@ module.exports = {
   getScheduledNotifications,
   createNotificationTemplate,
   getNotificationTemplates,
+  getNotificationTemplateById,
   updateNotificationTemplate,
   deleteNotificationTemplate,
   sendNotificationUsingTemplate,
   getNotificationStats,
-  exportNotifications
+  exportNotifications,
 };
