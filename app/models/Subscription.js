@@ -21,7 +21,7 @@ const subscriptionSchema = new mongoose.Schema(
       },
       currency: {
         type: String,
-        default: "NGN",
+        default: "USD",
         enum: ["NGN", "USD", "EUR", "GBP"],
       },
       billingCycle: {
@@ -34,27 +34,27 @@ const subscriptionSchema = new mongoose.Schema(
       churches: {
         type: Number,
         required: [true, "Church limit is required"],
-        min: [0, "Church limit cannot be negative"],
+        // min: [0, "Church limit cannot be negative"],
       },
       donationCampaigns: {
         type: Number,
         required: [true, "Donation campaign limit is required"],
-        min: [0, "Donation campaign limit cannot be negative"],
+        // min: [0, "Donation campaign limit cannot be negative"],
       },
       adminStaff: {
         type: Number,
         required: [true, "Admin staff limit is required"],
-        min: [0, "Admin staff limit cannot be negative"],
+        // min: [0, "Admin staff limit cannot be negative"],
       },
       volunteers: {
         type: Number,
         required: [true, "Volunteer limit is required"],
-        min: [0, "Volunteer limit cannot be negative"],
+        // min: [0, "Volunteer limit cannot be negative"],
       },
       volunteerTeams: {
         type: Number,
         required: [true, "Volunteer team limit is required"],
-        min: [0, "Volunteer team limit cannot be negative"],
+        // min: [0, "Volunteer team limit cannot be negative"],
       },
     },
     features: [
@@ -139,8 +139,8 @@ subscriptionSchema.methods.canPerformAction = function (
 
   const limit = limits[action];
 
-  // Unlimited (0 means unlimited)
-  if (limit === 0) return true;
+  // Unlimited (-1 means unlimited)
+  if (limit === -1) return true;
 
   // Check if current count is within limit
   return currentCount < limit;
@@ -162,7 +162,7 @@ subscriptionSchema.methods.getRemainingCapacity = function (
   const limit = limits[action];
 
   // Unlimited
-  if (limit === 0) return "unlimited";
+  if (limit === -1) return "unlimited";
 
   // Calculate remaining
   const remaining = limit - currentCount;

@@ -37,12 +37,12 @@ class EmailService {
       const mailOptions = {
         from: `"${process.env.MAIL_DISPLAYNAME}" <${process.env.MAIL_ADDR || process.env.MAILTRAP_USERNAME}>`,
         to: userEmail,
-        subject: `Welcome to ${churchName} - Church Management System`,
+        subject: `Welcome to ${churchName} - Church Sphere`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2c3e50;">Welcome to ${churchName}!</h2>
             <p>Hello ${userName},</p>
-            <p>Welcome to the Church Management System! We're excited to have you on board.</p>
+            <p>Welcome to the Church Sphere! We're excited to have you on board.</p>
             <p>You can now:</p>
             <ul>
               <li>Manage your church activities</li>
@@ -149,7 +149,7 @@ class EmailService {
       const mailOptions = {
         from: `"${process.env.MAIL_DISPLAYNAME}" <${process.env.MAIL_ADDR || process.env.MAILTRAP_USERNAME}>`,
         to: userEmail,
-        subject: "Password Reset Request - Church Management System",
+        subject: "Password Reset Request - Church Sphere",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #e74c3c;">Password Reset Request</h2>

@@ -1,9 +1,9 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
-const User = require('../models/User');
-const emailService = require('../../config/email');
-const { sendNotification } = require('../../config/pusher');
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const User = require("../models/User");
+const emailService = require("../../config/email");
+const { sendNotification } = require("../../config/pusher");
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -17,7 +17,7 @@ const register = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        error: { message: 'User with this email already exists' }
+        error: { message: "User with this email already exists" },
       });
     }
 
@@ -28,7 +28,7 @@ const register = async (req, res) => {
       email,
       phone,
       password,
-      role: role || 'member'
+      role: role || "member",
     });
 
     // Generate tokens
@@ -37,17 +37,21 @@ const register = async (req, res) => {
 
     // Send welcome email
     try {
-      await emailService.sendWelcomeEmail(email, user.fullName, 'Church Management System');
+      await emailService.sendWelcomeEmail(
+        email,
+        user.fullName,
+        "Church Sphere"
+      );
     } catch (emailError) {
-      console.error('Email sending failed:', emailError);
+      console.error("Email sending failed:", emailError);
       // Don't fail registration if email fails
     }
 
     // Send real-time notification
-    sendNotification('auth', 'user-registered', {
+    sendNotification("auth", "user-registered", {
       userId: user._id,
       email: user.email,
-      role: user.role
+      role: user.role,
     });
 
     res.status(201).json({
@@ -62,20 +66,20 @@ const register = async (req, res) => {
           role: user.role,
           isEmailVerified: user.isEmailVerified,
           isActive: user.isActive,
-          churches: user.churches
+          churches: user.churches,
         },
         tokens: {
           authToken,
-          refreshToken
-        }
+          refreshToken,
+        },
       },
-      message: 'User registered successfully'
+      message: "User registered successfully",
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error("Registration error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Registration failed' }
+      error: { message: "Registration failed" },
     });
   }
 };
@@ -88,11 +92,11 @@ const login = async (req, res) => {
     const { email, password } = req.body;
 
     // Check if user exists
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email }).select("+password");
     if (!user) {
       return res.status(401).json({
         success: false,
-        error: { message: 'Invalid credentials' }
+        error: { message: "Invalid credentials" },
       });
     }
 
@@ -100,7 +104,7 @@ const login = async (req, res) => {
     if (!user.isActive) {
       return res.status(401).json({
         success: false,
-        error: { message: 'Account is deactivated' }
+        error: { message: "Account is deactivated" },
       });
     }
 
@@ -109,7 +113,7 @@ const login = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        error: { message: 'Invalid credentials' }
+        error: { message: "Invalid credentials" },
       });
     }
 
@@ -122,10 +126,10 @@ const login = async (req, res) => {
     const refreshToken = user.generateRefreshToken();
 
     // Send real-time notification
-    sendNotification('auth', 'user-logged-in', {
+    sendNotification("auth", "user-logged-in", {
       userId: user._id,
       email: user.email,
-      lastLogin: user.lastLogin
+      lastLogin: user.lastLogin,
     });
 
     res.json({
@@ -141,20 +145,20 @@ const login = async (req, res) => {
           isEmailVerified: user.isEmailVerified,
           isActive: user.isActive,
           churches: user.churches,
-          lastLogin: user.lastLogin
+          lastLogin: user.lastLogin,
         },
         tokens: {
           authToken,
-          refreshToken
-        }
+          refreshToken,
+        },
       },
-      message: 'Login successful'
+      message: "Login successful",
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error("Login error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Login failed' }
+      error: { message: "Login failed" },
     });
   }
 };
@@ -169,19 +173,22 @@ const refreshToken = async (req, res) => {
     if (!token) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Refresh token is required' }
+        error: { message: "Refresh token is required" },
       });
     }
 
     // Verify refresh token
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
-    
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
+    );
+
     // Get user
     const user = await User.findById(decoded.id);
     if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
-        error: { message: 'Invalid refresh token' }
+        error: { message: "Invalid refresh token" },
       });
     }
 
@@ -194,28 +201,28 @@ const refreshToken = async (req, res) => {
       data: {
         tokens: {
           authToken,
-          refreshToken: newRefreshToken
-        }
+          refreshToken: newRefreshToken,
+        },
       },
-      message: 'Token refreshed successfully'
+      message: "Token refreshed successfully",
     });
   } catch (error) {
-    console.error('Token refresh error:', error);
-    if (error.name === 'JsonWebTokenError') {
+    console.error("Token refresh error:", error);
+    if (error.name === "JsonWebTokenError") {
       return res.status(401).json({
         success: false,
-        error: { message: 'Invalid refresh token' }
+        error: { message: "Invalid refresh token" },
       });
     }
-    if (error.name === 'TokenExpiredError') {
+    if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
-        error: { message: 'Refresh token expired' }
+        error: { message: "Refresh token expired" },
       });
     }
     res.status(500).json({
       success: false,
-      error: { message: 'Token refresh failed' }
+      error: { message: "Token refresh failed" },
     });
   }
 };
@@ -229,13 +236,13 @@ const logout = async (req, res) => {
     // For now, we'll just return success
     res.json({
       success: true,
-      message: 'Logout successful'
+      message: "Logout successful",
     });
   } catch (error) {
-    console.error('Logout error:', error);
+    console.error("Logout error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Logout failed' }
+      error: { message: "Logout failed" },
     });
   }
 };
@@ -252,7 +259,8 @@ const forgotPassword = async (req, res) => {
       // Don't reveal if user exists or not
       return res.json({
         success: true,
-        message: 'If an account with that email exists, a password reset link has been sent'
+        message:
+          "If an account with that email exists, a password reset link has been sent",
       });
     }
 
@@ -262,24 +270,28 @@ const forgotPassword = async (req, res) => {
 
     // Send reset email
     try {
-      await emailService.sendPasswordResetEmail(email, resetToken, user.fullName);
+      await emailService.sendPasswordResetEmail(
+        email,
+        resetToken,
+        user.fullName
+      );
     } catch (emailError) {
-      console.error('Password reset email failed:', emailError);
+      console.error("Password reset email failed:", emailError);
       return res.status(500).json({
         success: false,
-        error: { message: 'Failed to send password reset email' }
+        error: { message: "Failed to send password reset email" },
       });
     }
 
     res.json({
       success: true,
-      message: 'Password reset email sent successfully'
+      message: "Password reset email sent successfully",
     });
   } catch (error) {
-    console.error('Forgot password error:', error);
+    console.error("Forgot password error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Password reset request failed' }
+      error: { message: "Password reset request failed" },
     });
   }
 };
@@ -293,14 +305,14 @@ const resetPassword = async (req, res) => {
 
     // Find user with reset token
     const user = await User.findOne({
-      'passwordReset.token': token,
-      'passwordReset.expires': { $gt: Date.now() }
+      "passwordReset.token": token,
+      "passwordReset.expires": { $gt: Date.now() },
     });
 
     if (!user) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Invalid or expired reset token' }
+        error: { message: "Invalid or expired reset token" },
       });
     }
 
@@ -312,20 +324,24 @@ const resetPassword = async (req, res) => {
 
     // Send confirmation email
     try {
-      await emailService.sendWelcomeEmail(user.email, user.fullName, 'Church Management System');
+      await emailService.sendWelcomeEmail(
+        user.email,
+        user.fullName,
+        "Church Sphere"
+      );
     } catch (emailError) {
-      console.error('Password reset confirmation email failed:', emailError);
+      console.error("Password reset confirmation email failed:", emailError);
     }
 
     res.json({
       success: true,
-      message: 'Password reset successful'
+      message: "Password reset successful",
     });
   } catch (error) {
-    console.error('Reset password error:', error);
+    console.error("Reset password error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Password reset failed' }
+      error: { message: "Password reset failed" },
     });
   }
 };
@@ -338,14 +354,14 @@ const verifyEmail = async (req, res) => {
     const { token } = req.body;
 
     const user = await User.findOne({
-      'emailVerification.token': token,
-      'emailVerification.expires': { $gt: Date.now() }
+      "emailVerification.token": token,
+      "emailVerification.expires": { $gt: Date.now() },
     });
 
     if (!user) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Invalid or expired verification token' }
+        error: { message: "Invalid or expired verification token" },
       });
     }
 
@@ -357,13 +373,13 @@ const verifyEmail = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Email verified successfully'
+      message: "Email verified successfully",
     });
   } catch (error) {
-    console.error('Email verification error:', error);
+    console.error("Email verification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Email verification failed' }
+      error: { message: "Email verification failed" },
     });
   }
 };
@@ -378,7 +394,7 @@ const resendVerification = async (req, res) => {
     if (user.isEmailVerified) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Email is already verified' }
+        error: { message: "Email is already verified" },
       });
     }
 
@@ -388,24 +404,28 @@ const resendVerification = async (req, res) => {
 
     // Send verification email
     try {
-      await emailService.sendWelcomeEmail(user.email, user.fullName, 'Church Management System');
+      await emailService.sendWelcomeEmail(
+        user.email,
+        user.fullName,
+        "Church Sphere"
+      );
     } catch (emailError) {
-      console.error('Verification email failed:', emailError);
+      console.error("Verification email failed:", emailError);
       return res.status(500).json({
         success: false,
-        error: { message: 'Failed to send verification email' }
+        error: { message: "Failed to send verification email" },
       });
     }
 
     res.json({
       success: true,
-      message: 'Verification email sent successfully'
+      message: "Verification email sent successfully",
     });
   } catch (error) {
-    console.error('Resend verification error:', error);
+    console.error("Resend verification error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to resend verification email' }
+      error: { message: "Failed to resend verification email" },
     });
   }
 };
@@ -415,8 +435,8 @@ const resendVerification = async (req, res) => {
 // @access  Private
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).populate('churches.churchId');
-    
+    const user = await User.findById(req.user.id).populate("churches.churchId");
+
     res.json({
       success: true,
       data: {
@@ -433,15 +453,15 @@ const getMe = async (req, res) => {
           churches: user.churches,
           preferences: user.preferences,
           lastLogin: user.lastLogin,
-          createdAt: user.createdAt
-        }
-      }
+          createdAt: user.createdAt,
+        },
+      },
     });
   } catch (error) {
-    console.error('Get profile error:', error);
+    console.error("Get profile error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get profile' }
+      error: { message: "Failed to get profile" },
     });
   }
 };
@@ -477,16 +497,16 @@ const updateProfile = async (req, res) => {
           churches: user.churches,
           preferences: user.preferences,
           lastLogin: user.lastLogin,
-          updatedAt: user.updatedAt
-        }
+          updatedAt: user.updatedAt,
+        },
       },
-      message: 'Profile updated successfully'
+      message: "Profile updated successfully",
     });
   } catch (error) {
-    console.error('Update profile error:', error);
+    console.error("Update profile error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update profile' }
+      error: { message: "Failed to update profile" },
     });
   }
 };
@@ -504,7 +524,7 @@ const changePassword = async (req, res) => {
     if (!isCurrentPasswordValid) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Current password is incorrect' }
+        error: { message: "Current password is incorrect" },
       });
     }
 
@@ -514,13 +534,13 @@ const changePassword = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Password changed successfully'
+      message: "Password changed successfully",
     });
   } catch (error) {
-    console.error('Change password error:', error);
+    console.error("Change password error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to change password' }
+      error: { message: "Failed to change password" },
     });
   }
 };
@@ -537,7 +557,7 @@ const updatePreferences = async (req, res) => {
     if (notifications) {
       user.preferences.notifications = {
         ...user.preferences.notifications,
-        ...notifications
+        ...notifications,
       };
     }
     if (language) user.preferences.language = language;
@@ -548,15 +568,15 @@ const updatePreferences = async (req, res) => {
     res.json({
       success: true,
       data: {
-        preferences: user.preferences
+        preferences: user.preferences,
       },
-      message: 'Preferences updated successfully'
+      message: "Preferences updated successfully",
     });
   } catch (error) {
-    console.error('Update preferences error:', error);
+    console.error("Update preferences error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update preferences' }
+      error: { message: "Failed to update preferences" },
     });
   }
 };
@@ -574,7 +594,7 @@ const deleteAccount = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Password is incorrect' }
+        error: { message: "Password is incorrect" },
       });
     }
 
@@ -585,13 +605,13 @@ const deleteAccount = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Account deactivated successfully'
+      message: "Account deactivated successfully",
     });
   } catch (error) {
-    console.error('Delete account error:', error);
+    console.error("Delete account error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to deactivate account' }
+      error: { message: "Failed to deactivate account" },
     });
   }
 };
@@ -606,7 +626,7 @@ const getAllUsers = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const users = await User.find()
-      .select('-password')
+      .select("-password")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
@@ -621,15 +641,15 @@ const getAllUsers = async (req, res) => {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit)
-        }
-      }
+          pages: Math.ceil(total / limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Get all users error:', error);
+    console.error("Get all users error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get users' }
+      error: { message: "Failed to get users" },
     });
   }
 };
@@ -639,24 +659,24 @@ const getAllUsers = async (req, res) => {
 // @access  Private (Admin)
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
-    
+    const user = await User.findById(req.params.id).select("-password");
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: { message: 'User not found' }
+        error: { message: "User not found" },
       });
     }
 
     res.json({
       success: true,
-      data: { user }
+      data: { user },
     });
   } catch (error) {
-    console.error('Get user by ID error:', error);
+    console.error("Get user by ID error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get user' }
+      error: { message: "Failed to get user" },
     });
   }
 };
@@ -672,7 +692,7 @@ const updateUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: { message: 'User not found' }
+        error: { message: "User not found" },
       });
     }
 
@@ -682,7 +702,7 @@ const updateUser = async (req, res) => {
     if (email) user.email = email;
     if (phone) user.phone = phone;
     if (role) user.role = role;
-    if (typeof isActive === 'boolean') user.isActive = isActive;
+    if (typeof isActive === "boolean") user.isActive = isActive;
 
     await user.save();
 
@@ -697,16 +717,16 @@ const updateUser = async (req, res) => {
           phone: user.phone,
           role: user.role,
           isActive: user.isActive,
-          updatedAt: user.updatedAt
-        }
+          updatedAt: user.updatedAt,
+        },
       },
-      message: 'User updated successfully'
+      message: "User updated successfully",
     });
   } catch (error) {
-    console.error('Update user error:', error);
+    console.error("Update user error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to update user' }
+      error: { message: "Failed to update user" },
     });
   }
 };
@@ -721,7 +741,7 @@ const deleteUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: { message: 'User not found' }
+        error: { message: "User not found" },
       });
     }
 
@@ -732,13 +752,13 @@ const deleteUser = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'User deactivated successfully'
+      message: "User deactivated successfully",
     });
   } catch (error) {
-    console.error('Delete user error:', error);
+    console.error("Delete user error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to deactivate user' }
+      error: { message: "Failed to deactivate user" },
     });
   }
 };
@@ -753,7 +773,7 @@ const activateUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: { message: 'User not found' }
+        error: { message: "User not found" },
       });
     }
 
@@ -763,13 +783,13 @@ const activateUser = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'User activated successfully'
+      message: "User activated successfully",
     });
   } catch (error) {
-    console.error('Activate user error:', error);
+    console.error("Activate user error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to activate user' }
+      error: { message: "Failed to activate user" },
     });
   }
 };
@@ -785,7 +805,7 @@ const deactivateUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: { message: 'User not found' }
+        error: { message: "User not found" },
       });
     }
 
@@ -798,13 +818,13 @@ const deactivateUser = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'User deactivated successfully'
+      message: "User deactivated successfully",
     });
   } catch (error) {
-    console.error('Deactivate user error:', error);
+    console.error("Deactivate user error:", error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to deactivate user' }
+      error: { message: "Failed to deactivate user" },
     });
   }
 };
@@ -828,5 +848,5 @@ module.exports = {
   updateUser,
   deleteUser,
   activateUser,
-  deactivateUser
+  deactivateUser,
 };

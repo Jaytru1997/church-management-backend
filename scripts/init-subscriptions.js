@@ -9,7 +9,7 @@ const defaultSubscriptions = [
     displayName: "Free Plan",
     price: {
       amount: 0,
-      currency: "NGN",
+      currency: "USD",
       billingCycle: "monthly",
     },
     limits: {
@@ -45,8 +45,8 @@ const defaultSubscriptions = [
     name: "starter",
     displayName: "Starter Plan",
     price: {
-      amount: 3000,
-      currency: "NGN",
+      amount: 2,
+      currency: "USD",
       billingCycle: "monthly",
     },
     limits: {
@@ -102,8 +102,8 @@ const defaultSubscriptions = [
     name: "organisation",
     displayName: "Organisation Plan",
     price: {
-      amount: 9000,
-      currency: "NGN",
+      amount: 6,
+      currency: "USD",
       billingCycle: "monthly",
     },
     limits: {

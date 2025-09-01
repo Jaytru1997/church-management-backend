@@ -105,7 +105,7 @@ A comprehensive backend API for church management applications built with Node.j
    MAIL_PORT=587
    MAIL_ADDR=your-email@gmail.com
    MAIL_SECRET=your-email-app-password
-   MAIL_DISPLAYNAME=Church Management System
+   MAIL_DISPLAYNAME=Church Sphere
    
    # Cloudflare
    CLOUDFLARE_API_TOKEN=your-cloudflare-api-token
@@ -403,7 +403,7 @@ Send notification to church members
 
 Most endpoints require authentication via JWT token in the Authorization header:
 
-```
+```curl
 Authorization: Bearer <jwt_token>
 ```
 
@@ -555,4 +555,4 @@ For support and questions:
 
 ---
 
-**Built with ❤️ for the church community**
+> **Built with ❤️ for the church community**

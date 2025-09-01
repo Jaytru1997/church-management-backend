@@ -30,10 +30,6 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       trim: true,
-      match: [
-        /^0[789][01]\d{8}$/,
-        "Please enter a valid Nigerian phone number",
-      ],
     },
     password: {
       type: String,
